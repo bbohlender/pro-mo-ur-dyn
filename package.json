@@ -3,17 +3,19 @@
   "version": "1.0.0",
   "description": "Procedural 3D Video: A Procedural Approach For Describing Motion",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "generate:parser": "nearleyc grammar.ne -o src/parser/parser.ts",
     "build": "tsc -p build.tsconfig.json",
     "fix": "run-s fix:prettier fix:eslint",
     "fix:prettier": "prettier --write src/**/*.{ts,tsx}",
     "fix:eslint": "eslint src --fix",
-    "test": "nyc mocha -r ts-node/register ./tests/*"
+    "test": "nyc mocha ./tests/*"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/chai": "^4.3.4",
     "@types/mocha": "^10.0.1",
     "@types/moo": "^0.5.5",
     "@types/nearley": "^2.11.2",
