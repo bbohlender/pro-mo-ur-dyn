@@ -12,7 +12,7 @@ describe("parse grammar", () => {
 
     it("should parse grammars from test-data, then flatten, then nest again", () => {
         for (const { parsed, unparsed } of parsedAndUnparsedGrammarPairs) {
-            expect(nestAST(flattenAST(parse(unparsed)))).to.deep.equal(parsed)
+            expect(nestAST(flattenAST(parse(unparsed)), false)).to.deep.equal(parsed)
         }
     })
 
@@ -93,7 +93,7 @@ Description {
             
             Window --> color("#EEEEEE")
         }`)
-        expect(nestAST(flattenAST(nestedDescriptions))).to.deep.equal(nestedDescriptions)
+        expect(nestAST(flattenAST(nestedDescriptions), false)).to.deep.equal(nestedDescriptions)
     })
 
 })

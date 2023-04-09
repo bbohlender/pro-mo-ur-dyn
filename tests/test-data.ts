@@ -5,9 +5,8 @@ export const parsedAndUnparsedGrammarPairs: Array<{
     unparsed: string
 }> = [
     {
-        parsed: [
-            {
-                identifier: "A",
+        parsed: {
+            A: {
                 initialVariables: {},
                 nouns: {
                     a: {
@@ -25,7 +24,7 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                                                     {
                                                         type: "+",
                                                         children: [
-                                                            { type: "-", children: [{ type: "this" }] },
+                                                            { type: "-()", children: [{ type: "this" }] },
                                                             {
                                                                 type: "*",
                                                                 children: [
@@ -50,13 +49,12 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                 },
                 rootNounIdentifier: "a",
             },
-        ],
+        },
         unparsed: `A { a --> -this + 1 * 3 > 2 && false -> 2 | 2 }`,
     },
     {
-        parsed: [
-            {
-                identifier: "ABC",
+        parsed: {
+            ABC: {
                 initialVariables: {},
                 nouns: {
                     a: {
@@ -91,7 +89,7 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                                                 type: "sequential",
                                                 children: [
                                                     { type: "getVariable", identifier: "x" },
-                                                    { type: "return" },
+                                                    { type: "null" },
                                                 ],
                                             },
                                         ],
@@ -103,13 +101,12 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                 },
                 rootNounIdentifier: "a",
             },
-        ],
-        unparsed: `ABC { a --> this.x = 11 -> this % 2 -> switch 2 { case 0: case 1: if this == 0 then { this } else { this * 2 } case 3: this.x -> return } }`,
+        },
+        unparsed: `ABC { a --> this.x = 11 -> this % 2 -> switch 2 { case 0: case 1: if this == 0 then { this } else { this * 2 } case 3: this.x -> null } }`,
     },
     {
-        parsed: [
-            {
-                identifier: "Test",
+        parsed: {
+            Test: {
                 initialVariables: {
                     var: "123",
                 },
@@ -131,7 +128,7 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                 },
                 rootNounIdentifier: "a",
             },
-        ],
+        },
         unparsed: `Test (var: "123") { a --> { 40%: 1 60%: 2 * 3 } }`,
     },
 ]
