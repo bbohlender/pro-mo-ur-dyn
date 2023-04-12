@@ -2,6 +2,10 @@ import { expect } from "chai"
 import { parse } from "../src/index.js"
 import { interpreteTransformationSynchronous } from "../src/interpreter/interpreter.js"
 import { Operations } from "../src/interpreter/index.js"
+import { wrap } from "comlink"
+// @ts-ignore
+import Worker from "web-worker"
+import { NewWorker } from "../src/interpreter/worker.js"
 
 function testInterpreteSynchronously(text: string, operations: Operations<any> = {}, seed?: number): any {
     const descriptions = parse(text)
@@ -73,5 +77,30 @@ describe("interprete grammar synchronously", () => {
             testInterpreteSynchronously(`Test { a --> { 25%: 1 25%: 2 25%: 3 25%: 4 } }`, undefined, seed)
         )
         expect(results).to.deep.equal([1, 2, 3, 4, 4])
+    })
+
+    it("should compile web worker", async () => {
+        const newworker = new NewWorker(new URL("../src/interpreter/workerfunction", import.meta.url), {
+            name: "testInterpreteSynchronously",
+            type: "module",
+        })
+
+        let result = null
+
+        newworker.onmessage((e: any) => {
+            if (e.data) {
+                if (e.data.type == "finalResult") {
+                    result = e.data.data
+                }
+            }
+        })
+
+        const workerInterprete = wrap<import("../src/interpreter/workerfunction.js").WorkerInterprete>(
+            newworker.worker
+        ).testInterpreteSynchronously
+
+        await workerInterprete(`Test { a --> 10 -> this * 10 -> this + 1 }`)
+
+        expect(result).to.deep.equal(101)
     })
 })
