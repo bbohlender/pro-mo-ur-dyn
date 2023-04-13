@@ -79,7 +79,7 @@ describe("interprete grammar synchronously", () => {
         expect(results).to.deep.equal([1, 2, 3, 4, 4])
     })
 
-    it("should compile web worker", async () => {
+    it("web worker synchronous", async () => {
         const newworker = new NewWorker(new URL("../src/interpreter/workerfunction", import.meta.url), {
             name: "testInterpreteSynchronously",
             type: "module",
@@ -90,7 +90,10 @@ describe("interprete grammar synchronously", () => {
         newworker.onmessage((e: any) => {
             if (e.data) {
                 if (e.data.type == "finalResult") {
+                    console.log("synchron result")
+                    console.log(e.data.data)
                     result = e.data.data
+                    newworker.terminate()
                 }
             }
         })
@@ -99,8 +102,52 @@ describe("interprete grammar synchronously", () => {
             newworker.worker
         ).testInterpreteSynchronously
 
-        await workerInterprete(`Test { a --> 10 -> this * 10 -> this + 1 }`)
+        await workerInterprete(`Test { 
+            a --> 2 -> switch this { case 2: b case 3: c }
+            b --> if true then { this * 10 -> c } else { c }
+            c --> (20 * d)
+            d --> this / 2 -> this * 2
+        }`)
+
+        expect(result).to.deep.equal(400)
+    })
+
+    it("web worker asynchronous", async () => {
+        const newworker = new NewWorker(new URL("../src/interpreter/workerfunction", import.meta.url), {
+            name: "testInterpreteAsynchronously",
+            type: "module",
+        })
+
+        let result: any = null
+
+        let resultReady = false
+
+        newworker.onmessage((e: any) => {
+            if (e.data) {
+                if (e.data.type == "finalResult") {
+                    result = e.data.data[0].raw
+                    console.log(result)
+                    console.log("result")
+                    newworker.terminate()
+                    resultReady = true
+                }
+            }
+        })
+
+        const workerInterprete = wrap<import("../src/interpreter/workerfunction.js").WorkerInterprete>(
+            newworker.worker
+        ).testInterpreteAsynchronously
+
+        workerInterprete(`Test { a --> 10 -> this * 10 -> this + 1 }`)
+
+        while (!resultReady) {
+            await Sleep(100)
+        }
 
         expect(result).to.deep.equal(101)
     })
 })
+
+function Sleep(milliseconds: number) {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}

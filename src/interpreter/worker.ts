@@ -30,6 +30,10 @@ export class NewWorker {
 
     terminate() {
         this.worker.terminate()
+    }
+
+    reset() {
+        this.worker.terminate()
         this.worker = new Worker(this.url, this.options)
     }
 }

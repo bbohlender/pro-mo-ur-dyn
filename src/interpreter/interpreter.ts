@@ -101,7 +101,7 @@ function interpreteQueueRecursive(
     }
     const next: NextCallback<any, void> = nextQueued.bind(null, queue)
 
-    const startTime = performance.now()
+    const startTime = new Date().getTime()
     const progressAtStart = options.getComputeProgress(nextEntry.value)
 
     /**
@@ -112,10 +112,11 @@ function interpreteQueueRecursive(
      */
     while (
         nextEntry != null &&
-        performance.now() - startTime < options.computeDurationMS &&
+        nextEntry.stack.length > 0 &&
+        new Date().getTime() - startTime < options.computeDurationMS &&
         !options.shouldInterrrupt(progressAtStart, options.getComputeProgress(nextEntry.value))
     ) {
-        const transformation = nextEntry.stack.pop()!
+        const transformation = nextEntry.stack.shift()!
         if (transformation.type === "parallel") {
             queue.pop()
             for (const [index, nextTransformation] of transformation.children.entries()) {
