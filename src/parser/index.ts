@@ -83,7 +83,7 @@ export type ParsedReturn = {
     id?: string
 }
 export type ParsedUnaryOperator = {
-    type: "!" | "-"
+    type: "!" | "-()"
     childrenIds: [valueId: string]
 }
 export type ParsedStochasticSwitch = {

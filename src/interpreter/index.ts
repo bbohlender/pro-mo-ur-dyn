@@ -1,7 +1,7 @@
 import { NestedDescription, NestedStochasticSwitch, NestedTransformation } from "../index.js"
 
 export type Operation<T> = {
-    execute: (...parameters: ReadonlyArray<T>) => Array<T> | T
+    execute: (...parameters: ReadonlyArray<any>) => Array<T> | T
     includeThis: boolean
     defaultParameters: Array<() => NestedTransformation>
 }
@@ -25,6 +25,9 @@ export type InterpreterOptions<T> = Readonly<{
         onBeforeTransformation?: (step: NestedTransformation, value: Value<T>) => void
         onAfterTransformation?: (step: NestedTransformation, value: Value<T>[]) => void
     }
+    /**
+     * compares the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
+     */
     comparePriority: (v1: T, v2: T) => number
     createValue: (initialVariables: NestedDescription["initialVariables"]) => T
     cloneValue: (value: T) => T
