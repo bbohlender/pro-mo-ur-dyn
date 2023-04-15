@@ -1,7 +1,13 @@
 import { NestedTransformation } from "../index.js"
 import { Value } from "./index.js"
 
-export type QueueEntry<T> = { value: Value<T>; stack: Array<NestedTransformation> }
+export type QueueEntry<T> = {
+    value: Value<T>
+    /**
+     * list of transformation that still needs to be executed, next transformation that should be executed is at stack[0]
+     */
+    stack: Array<NestedTransformation>
+}
 
 export class Queue<T> {
     /**

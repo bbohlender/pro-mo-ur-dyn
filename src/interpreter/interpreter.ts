@@ -73,13 +73,13 @@ function nextQueued(
         for (const raw of newRaw) {
             queue.push({
                 value: clone(currentEntry.value, options, raw),
-                stack: [...currentEntry.stack, ...newTransformations],
+                stack: [...newTransformations, ...currentEntry.stack],
             })
         }
         return
     }
 
-    currentEntry.stack.push(...newTransformations)
+    currentEntry.stack.unshift(...newTransformations)
 
     if (newRaw !== undefined) {
         //we need to reinsert the entry since the value changed which can change the change the priority and this the order in the queue
@@ -95,6 +95,7 @@ function interpreteQueueRecursive(
     options: InterpreterOptions<any>,
     publishResult: (values: Array<Value<any>>, isLast: boolean) => void
 ) {
+    const resultsFinal: Value<any>[] = []
     let nextEntry: QueueEntry<any> | undefined = queue.peek()
     if (nextEntry == null) {
         return
@@ -112,30 +113,27 @@ function interpreteQueueRecursive(
      */
     while (
         nextEntry != null &&
-        nextEntry.stack.length > 0 &&
         new Date().getTime() - startTime < options.computeDurationMS &&
         !options.shouldInterrrupt(progressAtStart, options.getComputeProgress(nextEntry.value))
     ) {
         const transformation = nextEntry.stack.shift()!
-        if (transformation.type === "parallel") {
+        if (!transformation) {
+            queue.pop()
+            resultsFinal.push(nextEntry.value)
+        } else if (transformation.type === "parallel") {
             queue.pop()
             for (const [index, nextTransformation] of transformation.children.entries()) {
                 queue.push({
                     value: clone(nextEntry.value, options, undefined, [...nextEntry.value.index, index]),
-                    stack: [...nextEntry.stack, nextTransformation],
+                    stack: [nextTransformation, ...nextEntry.stack],
                 })
             }
         } else {
             interpreteTransformation(nextEntry.value, transformation, descriptions, options, next)
         }
-
         nextEntry = queue.peek()
     }
-
-    publishResult(
-        queue.list.map(({ value }) => value),
-        nextEntry == null
-    )
+    publishResult(resultsFinal, nextEntry == null)
 
     if (nextEntry == null || options.shouldWait(options.getComputeProgress(nextEntry.value))) {
         return

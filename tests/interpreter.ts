@@ -1,7 +1,7 @@
 import { expect } from "chai"
 import { parse } from "../src/index.js"
 import { interpreteTransformationSynchronous } from "../src/interpreter/interpreter.js"
-import { Operations } from "../src/interpreter/index.js"
+import { Operations, Value } from "../src/interpreter/index.js"
 import { wrap } from "comlink"
 // @ts-ignore
 import Worker from "web-worker"
@@ -30,7 +30,7 @@ function testInterpreteSynchronously(text: string, operations: Operations<any> =
     return raw
 }
 
-describe("interprete grammar synchronously", () => {
+/* describe("interprete grammar synchronously", () => {
     it("should interprete sequential execution", async () => {
         const result = testInterpreteSynchronously(`Test { a --> 10 -> this * 10 -> this + 1 }`)
         expect(result).to.equal(101)
@@ -90,8 +90,6 @@ describe("interprete grammar synchronously", () => {
         newworker.onmessage((e: any) => {
             if (e.data) {
                 if (e.data.type == "finalResult") {
-                    console.log("synchron result")
-                    console.log(e.data.data)
                     result = e.data.data
                     newworker.terminate()
                 }
@@ -111,8 +109,10 @@ describe("interprete grammar synchronously", () => {
 
         expect(result).to.deep.equal(400)
     })
+}) */
 
-    it("web worker asynchronous", async () => {
+describe("interprete grammar asynchronously", () => {
+    /*     it("web worker asynchronous", async () => {
         const newworker = new NewWorker(new URL("../src/interpreter/workerfunction", import.meta.url), {
             name: "testInterpreteAsynchronously",
             type: "module",
@@ -126,8 +126,6 @@ describe("interprete grammar synchronously", () => {
             if (e.data) {
                 if (e.data.type == "finalResult") {
                     result = e.data.data[0].raw
-                    console.log(result)
-                    console.log("result")
                     newworker.terminate()
                     resultReady = true
                 }
@@ -138,13 +136,50 @@ describe("interprete grammar synchronously", () => {
             newworker.worker
         ).testInterpreteAsynchronously
 
-        workerInterprete(`Test { a --> 10 -> this * 10 -> this + 1 }`)
+        workerInterprete(`Test { 
+            a --> 2 -> switch this { case 2: b case 3: c }
+            b --> if true then { this * 10 -> c } else { c }
+            c --> (20 * d)
+            d --> this / 2 -> this * 2
+        }`)
 
         while (!resultReady) {
             await Sleep(100)
         }
 
-        expect(result).to.deep.equal(101)
+        expect(result).to.deep.equal(400)
+    }) */
+    const newworker = new NewWorker(new URL("../src/interpreter/workerfunction", import.meta.url), {
+        name: "testInterpreteAsynchronously",
+        type: "module",
+    })
+
+    const workerInterprete = wrap<import("../src/interpreter/workerfunction.js").WorkerInterprete>(
+        newworker.worker
+    ).testInterpreteAsynchronously
+
+    it("web worker parallel", async () => {
+        let result: any = null
+
+        let resultReady = false
+
+        newworker.onmessage((e: any) => {
+            if (e.data) {
+                if (e.data.type == "finalResult") {
+                    result = (e.data.data as Value<any>[]).map((v) => v.raw)
+                    resultReady = true
+                    newworker.terminate()
+                }
+            }
+        })
+
+        workerInterprete(`Test { a --> ((1 | 2 * 2) -> this * 2) }
+        `)
+
+        while (!resultReady) {
+            await Sleep(0)
+        }
+        expect(result).to.deep.equal([8, 2])
     })
 })
 

@@ -1,6 +1,3 @@
-//TODO: declare protocol for communication (message types)
-//TODO: write a good interface to start and stop (restart) the interpretation that abstracts the worker and has a callback which gets called with the new results
-
 import { expose } from "comlink"
 import { Operations, Value } from "./index.js"
 import { parse } from "../index.js"
@@ -47,9 +44,9 @@ function testInterpreteAsynchronously(text: string, seed?: number) {
         },
         (values: Array<Value<any>>, isLast: boolean) => {
             if (isLast) {
-                postMessage({ type: "result", data: values })
-            } else {
                 postMessage({ type: "finalResult", data: values })
+            } else {
+                postMessage({ type: "result", data: values })
             }
         }
     )
