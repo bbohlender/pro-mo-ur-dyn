@@ -1,9 +1,8 @@
 import { expect } from "chai"
 import { parse } from "../src/index.js"
-import { WorkerInterface } from "../src/interpreter/worker-interface.js"
-import { Operations, interpreteTransformationSynchronous } from "../src/interpreter/index.js"
+import { Operations, interpreteTransformationSynchronous, WorkerInterface } from "../src/index.js"
 
-function testInterpreteSynchronously(text: string, operations: Operations<any> = {}, seed?: number): any {
+function testInterpreteSynchronously(text: string, operations: Operations = {}, seed?: number): any {
     const descriptions = parse(text)
     const [description] = Object.values(descriptions)
     const rootTransformation = description.nouns[description.rootNounIdentifier]

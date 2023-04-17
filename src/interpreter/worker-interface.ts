@@ -9,6 +9,7 @@ export type WorkerMessage =
     | {
           type: WorkerMessageType.Interprete
           descriptions: NestedDescriptions
+          requestedProgress: any
       }
     | {
           type: WorkerMessageType.UpdateRequestedProgress
@@ -16,7 +17,7 @@ export type WorkerMessage =
       }
     | {
           type: WorkerMessageType.Results
-          values: Array<Value<any>>
+          values: Array<Value>
           isFinal: boolean
       }
 
@@ -32,7 +33,7 @@ export class WorkerInterface {
     constructor(
         private url: URL,
         private options: { credentials?: RequestCredentials; name?: string; type?: WorkerType },
-        private onResult: (values: Array<Value<any>>, isFinal: boolean) => void
+        private onResult: (values: Array<Value>, isFinal: boolean) => void
     ) {
         this.worker = new Worker(url, options)
         this.worker.onmessage = this.onMessage.bind(this)
@@ -50,6 +51,7 @@ export class WorkerInterface {
         this.sendMessage({
             type: WorkerMessageType.Interprete,
             descriptions,
+            requestedProgress,
         })
     }
 

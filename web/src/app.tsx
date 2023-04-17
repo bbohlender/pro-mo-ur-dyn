@@ -1,8 +1,21 @@
 import { Canvas } from "@react-three/fiber"
-import { PlayerControls } from "./components/player-controls.js"
 import { Grid, OrbitControls } from "@react-three/drei"
 import { Interface2D } from "./components/interface-2d.js"
-import { workerStart } from "libs/worker.js"
+import { WorkerInterface, parse } from "pro-3d-video"
+//@ts-ignore
+import Url from "pro-3d-video/dist/domains/motion/worker.js?url"
+
+function startWorker() {
+    const workerInterface = new WorkerInterface(
+        Url,
+        {
+            name: "worker",
+            type: "module",
+        },
+        console.log
+    )
+    workerInterface.interprete(parse(`Test { a --> moveTo(10, 10, 0, 10) }`), 10000)
+}
 
 export default function App() {
     return (
@@ -12,7 +25,9 @@ export default function App() {
                 <OrbitControls />
             </Canvas>
             <Interface2D />
-            <button onClick={workerStart} style={{ backgroundColor: "blue", color: "white" }}>
+            <button
+                onClick={startWorker}
+                style={{ position: "absolute", top: 0, backgroundColor: "blue", color: "white" }}>
                 start ww
             </button>
         </>

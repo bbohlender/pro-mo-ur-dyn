@@ -1,4 +1,4 @@
-import { initializeWorker } from "../worker.js"
-import { MotionEntity, interpreterOptions } from "./index.js"
+import { initializeWorker } from "../../interpreter/initialize-worker.js"
+import { interpreterOptions } from "./index.js"
 
-initializeWorker<MotionEntity>(interpreterOptions, 10000)
+initializeWorker(interpreterOptions)
