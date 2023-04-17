@@ -2,7 +2,7 @@
   "name": "pro-3d-video",
   "version": "1.0.0",
   "description": "Procedural 3D Video: A Procedural Approach For Describing Motion",
-  "main": "index.js",
+  "main": "dist/index.js",
   "type": "module",
   "scripts": {
     "generate:parser": "nearleyc grammar.ne -o src/parser/parser.ts",
@@ -10,8 +10,7 @@
     "fix": "run-s fix:prettier fix:eslint",
     "fix:prettier": "prettier --write 'src/**/*.{ts,tsx}'",
     "fix:eslint": "eslint src --fix",
-    "test": "nyc mocha ./tests/* --timeout 15000",
-    "test:interpreter": "nyc mocha ./tests/interpreter.ts --timeout 15000"
+    "test": "nyc mocha ./tests/*.spec.ts --timeout 15000"
   },
   "author": "",
   "license": "ISC",

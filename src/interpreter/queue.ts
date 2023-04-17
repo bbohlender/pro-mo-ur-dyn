@@ -15,6 +15,8 @@ export class Queue<T> {
      */
     public readonly list: Array<QueueEntry<T>> = []
 
+    public readonly results: Array<Value<T>> = []
+
     /**
      *
      * @param compare should compare the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
@@ -39,6 +41,10 @@ export class Queue<T> {
      * add a entry to the queue sorted by priority
      */
     push(entry: QueueEntry<T>): void {
+        if (entry.stack.length === 0) {
+            this.results.push(entry.value)
+            return
+        }
         let i = this.list.length - 1
         while (i > 0 && this.compare(entry.value.raw, this.list[i].value.raw) < 0) {
             i--

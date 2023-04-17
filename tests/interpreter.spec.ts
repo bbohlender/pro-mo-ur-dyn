@@ -1,11 +1,7 @@
 import { expect } from "chai"
 import { parse } from "../src/index.js"
-import { interpreteTransformationSynchronous } from "../src/interpreter/interpreter.js"
-import { Operations, Value } from "../src/interpreter/index.js"
-import { wrap } from "comlink"
-// @ts-ignore
-import Worker from "web-worker"
-import { NewWorker } from "../src/interpreter/worker.js"
+import { WorkerInterface } from "../src/interpreter/worker-interface.js"
+import { Operations, interpreteTransformationSynchronous } from "../src/interpreter/index.js"
 
 function testInterpreteSynchronously(text: string, operations: Operations<any> = {}, seed?: number): any {
     const descriptions = parse(text)
@@ -149,40 +145,29 @@ describe("interprete grammar asynchronously", () => {
 
         expect(result).to.deep.equal(400)
     }) */
-    const newworker = new NewWorker(new URL("../src/interpreter/workerfunction", import.meta.url), {
-        name: "testInterpreteAsynchronously",
-        type: "module",
-    })
-
-    const workerInterprete = wrap<import("../src/interpreter/workerfunction.js").WorkerInterprete>(
-        newworker.worker
-    ).testInterpreteAsynchronously
 
     it("web worker parallel", async () => {
-        let result: any = null
+        const result = await testAsyncInterprete(`Test { a --> ((1 | 2 * 2) -> this * 2) }`)
 
-        let resultReady = false
-
-        newworker.onmessage((e: any) => {
-            if (e.data) {
-                if (e.data.type == "finalResult") {
-                    result = (e.data.data as Value<any>[]).map((v) => v.raw)
-                    resultReady = true
-                    newworker.terminate()
-                }
-            }
-        })
-
-        workerInterprete(`Test { a --> ((1 | 2 * 2) -> this * 2) }
-        `)
-
-        while (!resultReady) {
-            await Sleep(0)
-        }
         expect(result).to.deep.equal([8, 2])
     })
 })
 
-function Sleep(milliseconds: number) {
-    return new Promise((resolve) => setTimeout(resolve, milliseconds))
+function testAsyncInterprete(descriptions: string): Promise<Array<any>> {
+    return new Promise((resolve) => {
+        const workerInterface = new WorkerInterface(
+            new URL("./worker.js", import.meta.url),
+            {
+                name: "testAsyncInterprete",
+                type: "module",
+            },
+            (values, isFinal) => {
+                if (isFinal) {
+                    workerInterface.terminate()
+                    resolve(values.map((v) => v.raw))
+                }
+            }
+        )
+        workerInterface.interprete(parse(descriptions), null)
+    })
 }

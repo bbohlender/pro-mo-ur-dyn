@@ -1,4 +1,4 @@
-import { NestedDescriptions, ParsedDescriptions } from "../src/index.js"
+import { NestedDescriptions } from "../src/index.js"
 
 export const parsedAndUnparsedGrammarPairs: Array<{
     parsed: NestedDescriptions

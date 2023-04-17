@@ -29,11 +29,12 @@ export const interpreterOptions: InterpreterOptions<MotionEntity> = {
         return e2.keyframes.at(-1)![3] - e1.keyframes.at(-1)![3]
     },
     computeDurationMS: 1000,
-    createValue({ type, x,y,z, time}) {
+    createValue({ type, x, y, z, time }) {
         return {
-        type: motionEntityTypeMap[type as keyof typeof motionEntityTypeMap] ??  MotionEntityType.Pedestrian,
-        keyframes: [x ?? 0, y ?? 0, z ?? 0, time ?? 0]
-    }},
+            type: motionEntityTypeMap[type as keyof typeof motionEntityTypeMap] ?? MotionEntityType.Pedestrian,
+            keyframes: [x ?? 0, y ?? 0, z ?? 0, time ?? 0],
+        }
+    },
     getComputeProgress(entity) {
         return entity.keyframes.at(-1)![3]
     },
@@ -43,7 +44,7 @@ export const interpreterOptions: InterpreterOptions<MotionEntity> = {
     },
     shouldWait(p) {
         return p > 10000 //only computes the first 10 second
-    }
+    },
 }
 
 export enum MotionEntityType {
@@ -55,7 +56,7 @@ export enum MotionEntityType {
 const motionEntityTypeMap = {
     car: MotionEntityType.Car,
     cylcist: MotionEntityType.Cyclist,
-    predestrian: MotionEntityType.Pedestrian
+    predestrian: MotionEntityType.Pedestrian,
 }
 
 export type MotionEntity = {
