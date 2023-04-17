@@ -99,8 +99,6 @@ export function interprete(
 
 //TODO later: group values and transformations for SIMD (=> check if that creates a speedup)
 
-//TODO: do sth. with the result once all transformations are applied (= the stack is empty)
-
 function nextQueued(
     queue: Queue,
     value: Value,
