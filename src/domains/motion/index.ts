@@ -1,3 +1,4 @@
+import { NestedPrecomputedOperation } from "../../index.js"
 import { InterpreterOptions, Operations } from "../../interpreter/index.js"
 
 const operations: Operations = {
@@ -27,9 +28,26 @@ export const interpreterOptions: InterpreterOptions = {
             return { keyframes: [...value.keyframes], type: value.type }
         }
     },
-    comparePriority(e1, e2) {
+    comparePriority(e1, e2, currTrans) {
         if (!isMotionEntity(e1) || !isMotionEntity(e2)) {
             return 0
+        }
+        if (
+            typeof currTrans === "object" &&
+            !Array.isArray(currTrans) &&
+            currTrans !== null &&
+            "type" in currTrans &&
+            currTrans.type == "precomputedOperation" &&
+            "identifier" in currTrans
+        ) {
+            const curr = currTrans as NestedPrecomputedOperation
+            //change queue value according to function name
+            if (curr.identifier) {
+                const time = curr.children[3]
+                return e2.keyframes.at(-1)![3] - (time + e1.keyframes.at(-1)![3])
+            } else {
+                return e2.keyframes.at(-1)![3] - e1.keyframes.at(-1)![3]
+            }
         }
         return e2.keyframes.at(-1)![3] - e1.keyframes.at(-1)![3]
     },
