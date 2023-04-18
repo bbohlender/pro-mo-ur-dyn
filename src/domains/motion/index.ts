@@ -28,28 +28,33 @@ export const interpreterOptions: InterpreterOptions = {
             return { keyframes: [...value.keyframes], type: value.type }
         }
     },
-    comparePriority(e1, e2, currTrans) {
+    comparePriority(e1, e2, e1Trans, e2Trans) {
         if (!isMotionEntity(e1) || !isMotionEntity(e2)) {
             return 0
         }
+        let addedCurrTime = 0
+        let addedListItemTime = 0
         if (
-            typeof currTrans === "object" &&
-            !Array.isArray(currTrans) &&
-            currTrans !== null &&
-            "type" in currTrans &&
-            currTrans.type == "precomputedOperation" &&
-            "identifier" in currTrans
+            typeof e1Trans === "object" &&
+            !Array.isArray(e1Trans) &&
+            e1Trans !== null &&
+            "type" in e1Trans &&
+            e1Trans.type == "precomputedOperation"
         ) {
-            const curr = currTrans as NestedPrecomputedOperation
-            //change queue value according to function name
-            if (curr.identifier) {
-                const time = curr.children[3]
-                return e2.keyframes.at(-1)![3] - (time + e1.keyframes.at(-1)![3])
-            } else {
-                return e2.keyframes.at(-1)![3] - e1.keyframes.at(-1)![3]
-            }
+            const oper = e1Trans as NestedPrecomputedOperation
+            addedCurrTime = oper.children[3]
         }
-        return e2.keyframes.at(-1)![3] - e1.keyframes.at(-1)![3]
+        if (
+            typeof e2Trans === "object" &&
+            !Array.isArray(e2Trans) &&
+            e2Trans !== null &&
+            "type" in e2Trans &&
+            e2Trans.type == "precomputedOperation"
+        ) {
+            const oper = e2Trans as NestedPrecomputedOperation
+            addedListItemTime = oper.children[3]
+        }
+        return e2.keyframes.at(-1)![3] + addedListItemTime - (e1.keyframes.at(-1)![3] + addedCurrTime)
     },
     computeDurationMS: 1000,
     createValue({ type, x, y, z, time }) {

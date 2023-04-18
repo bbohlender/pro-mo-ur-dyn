@@ -52,7 +52,7 @@ export type InterpreterOptions = Readonly<{
     /**
      * compares the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
      */
-    comparePriority: (v1: unknown, v2: unknown, currTrans?: unknown) => number
+    comparePriority: (v1: unknown, v2: unknown, v1Trans: unknown, v2Trans: unknown) => number
     createValue: (initialVariables: NestedDescription["initialVariables"]) => any
     cloneValue: (value: unknown) => unknown
     operations: Operations
@@ -110,20 +110,16 @@ function nextQueued(
     ...newTransformations: Array<NestedTransformation>
 ) {
     const currentEntry = queue.peek()
-    const nextTransform = newTransformations.length > 0 ? newTransformations[0] : undefined
     if (currentEntry == null) {
         return
     }
     if (Array.isArray(newRaw)) {
         queue.pop()
         for (const raw of newRaw) {
-            queue.push(
-                {
-                    value: clone(currentEntry.value, options, raw),
-                    stack: [...newTransformations, ...currentEntry.stack],
-                },
-                nextTransform
-            )
+            queue.push({
+                value: clone(currentEntry.value, options, raw),
+                stack: [...newTransformations, ...currentEntry.stack],
+            })
         }
         return
     }
@@ -134,7 +130,7 @@ function nextQueued(
         //we need to reinsert the entry since the value changed which can change the change the priority and this the order in the queue
         queue.pop()
         currentEntry.value.raw = newRaw
-        queue.push(currentEntry, nextTransform)
+        queue.push(currentEntry)
     }
 }
 
