@@ -1,23 +1,77 @@
 import { NestedPrecomputedOperation } from "../../index.js"
-import { InterpreterOptions, Operations } from "../../interpreter/index.js"
+import { InterpreterOptions, OperationNextCallback, Operations } from "../../interpreter/index.js"
+
+const TIME_STEP = 100 //ms
+const RADIUS = 0.1 //meter
 
 export const operations: Operations = {
     moveTo: {
         defaultParameters: [],
         includeThis: true,
-        execute: (entity: MotionEntity, x: number, y: number, z: number, dt: number) => {
+        execute: (next: OperationNextCallback, entity: MotionEntity, x: number, y: number, z: number, dt: number) => {
             const t = entity.keyframes[entity.keyframes.length - 1]![3]
             entity.keyframes.push([x, y, z, t + dt])
-            return entity
+            return next(entity)
         },
     },
     moveBy: {
         defaultParameters: [],
         includeThis: true,
-        execute: (entity: MotionEntity, dx: number, dy: number, dz: number, dt: number) => {
+        execute: (
+            next: OperationNextCallback,
+            entity: MotionEntity,
+            dx: number,
+            dy: number,
+            dz: number,
+            dt: number
+        ) => {
             const [x, y, z, t] = entity.keyframes[entity.keyframes.length - 1]!
             entity.keyframes.push([x + dx, y + dy, z + dz, t + dt])
-            return entity
+            return next(entity)
+        },
+    },
+    moveToAndDodge: {
+        defaultParameters: [],
+        includeThis: true,
+        execute: (
+            next: OperationNextCallback,
+            entity: MotionEntity,
+            targetX: number,
+            targetY: number,
+            targetZ: number,
+            dt: number
+        ) => {
+            const [x, y, z, t] = entity.keyframes.at(-1)!
+            const timeStep = Math.min(dt, TIME_STEP)
+            const dx = targetX - x
+            const dy = targetY - y
+            const dz = targetZ - z
+            const timeRatio = timeStep / dt
+            const newX = x + dx * timeRatio
+            const newY = y + dy * timeRatio
+            const newZ = z + dz * timeRatio
+
+            let nextX = x,
+                nextY = y,
+                nextZ = z
+            if (true) {
+                //TODO: check collide
+                //not collide
+                nextX = newX
+                nextY = newY
+                nextZ = newZ
+            }
+            entity.keyframes.push([nextX, nextY, nextZ, t + timeStep])
+
+            if (dt <= TIME_STEP) {
+                return next(entity) //done
+            }
+            return next(entity, {
+                type: "precomputedOperation",
+                identifier: "moveToAndDodge",
+                parameters: [targetX, targetY, targetZ, dt - timeStep],
+            }) //schedule again
+            //TODO: somehow get the id from the transformation to here
         },
     },
 }
@@ -34,25 +88,13 @@ export const interpreterOptions: InterpreterOptions = {
         }
         let addedCurrTime = 0
         let addedListItemTime = 0
-        if (
-            typeof e1Trans === "object" &&
-            !Array.isArray(e1Trans) &&
-            e1Trans !== null &&
-            "type" in e1Trans &&
-            e1Trans.type == "precomputedOperation"
-        ) {
+        if (isNestedPrecomputedOperation(e1Trans)) {
             const oper = e1Trans as NestedPrecomputedOperation
-            addedCurrTime = oper.children[3]
+            addedCurrTime = oper.parameters[3]
         }
-        if (
-            typeof e2Trans === "object" &&
-            !Array.isArray(e2Trans) &&
-            e2Trans !== null &&
-            "type" in e2Trans &&
-            e2Trans.type == "precomputedOperation"
-        ) {
+        if (isNestedPrecomputedOperation(e2Trans)) {
             const oper = e2Trans as NestedPrecomputedOperation
-            addedListItemTime = oper.children[3]
+            addedListItemTime = oper.parameters[3]
         }
         return (
             e1.keyframes[e1.keyframes.length - 1]![3] +
@@ -101,4 +143,14 @@ export type MotionEntity = {
 
 function isMotionEntity(value: unknown): value is MotionEntity {
     return typeof value === "object" && value != null && "keyframes" in value
+}
+
+function isNestedPrecomputedOperation(value: unknown): value is NestedPrecomputedOperation {
+    return (
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        value !== null &&
+        "type" in value &&
+        value.type == "precomputedOperation"
+    )
 }

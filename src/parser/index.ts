@@ -182,7 +182,7 @@ export type NestedOperation = {
 }
 export type NestedPrecomputedOperation = {
     type: "precomputedOperation"
-    children: Array<any>
+    parameters: Array<any>
     identifier: string
     id?: string
 }
@@ -228,3 +228,5 @@ export type NestedGetVariable = {
     identifier: string
     id?: string
 }
+
+export * from "./structure.js"
