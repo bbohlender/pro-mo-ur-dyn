@@ -4,6 +4,7 @@ import { Interface2D } from "./components/interface-2d.js"
 import { WorkerInterface, parse } from "pro-3d-video"
 //@ts-ignore
 import Url from "pro-3d-video/dist/domains/motion/worker.js?url"
+import { Viewer } from "./components/viewer/index.js"
 
 function startWorker() {
     const workerInterface = new WorkerInterface(
@@ -22,6 +23,7 @@ export default function App() {
         <>
             <Canvas style={{ width: "100vw", height: "100svh" }}>
                 <Grid args={[10, 10, 10, 10]} />
+                <Viewer />
                 <OrbitControls />
             </Canvas>
             <Interface2D />

@@ -221,3 +221,5 @@ export type NestedGetVariable = {
     identifier: string
     id?: string
 }
+
+export * from "./structure.js"
