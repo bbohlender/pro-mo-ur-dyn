@@ -144,6 +144,7 @@ export type NestedTransformation =
     | NestedParallel
     | NestedSequantial
     | NestedOperation
+    | NestedPrecomputedOperation
     | NestedNounReference
     | ParsedRaw
     | ParsedThis
@@ -176,6 +177,12 @@ export type NestedSequantial = {
 export type NestedOperation = {
     type: "operation"
     children: Array<NestedTransformation>
+    identifier: string
+    id?: string
+}
+export type NestedPrecomputedOperation = {
+    type: "precomputedOperation"
+    children: Array<any>
     identifier: string
     id?: string
 }
