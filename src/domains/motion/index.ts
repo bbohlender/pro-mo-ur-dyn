@@ -1,23 +1,76 @@
-import { NestedPrecomputedOperation } from "../../index.js"
-import { InterpreterOptions, Operations } from "../../interpreter/index.js"
+import { InterpreterOptions, OperationNextCallback, Operations } from "../../interpreter/index.js"
+
+const TIME_STEP = 100 //ms
+const RADIUS = 0.1 //meter
 
 const operations: Operations = {
     moveTo: {
         defaultParameters: [],
         includeThis: true,
-        execute: (entity: MotionEntity, x: number, y: number, z: number, dt: number) => {
+        execute: (next: OperationNextCallback, entity: MotionEntity, x: number, y: number, z: number, dt: number) => {
             const t = entity.keyframes.at(-1)![3]
             entity.keyframes.push([x, y, z, t + dt])
-            return entity
+            return next(entity)
         },
     },
     moveBy: {
         defaultParameters: [],
         includeThis: true,
-        execute: (entity: MotionEntity, dx: number, dy: number, dz: number, dt: number) => {
+        execute: (
+            next: OperationNextCallback,
+            entity: MotionEntity,
+            dx: number,
+            dy: number,
+            dz: number,
+            dt: number
+        ) => {
             const [x, y, z, t] = entity.keyframes.at(-1)!
             entity.keyframes.push([x + dx, y + dy, z + dz, t + dt])
-            return entity
+            return next(entity)
+        },
+    },
+    moveToAndDodge: {
+        defaultParameters: [],
+        includeThis: true,
+        execute: (
+            next: OperationNextCallback,
+            entity: MotionEntity,
+            targetX: number,
+            targetY: number,
+            targetZ: number,
+            dt: number
+        ) => {
+            const [x, y, z, t] = entity.keyframes.at(-1)!
+            const timeStep = Math.min(dt, TIME_STEP)
+            const dx = targetX - x
+            const dy = targetY - y
+            const dz = targetZ - z
+            const timeRatio = timeStep / dt
+            const newX = x + dx * timeRatio
+            const newY = y + dy * timeRatio
+            const newZ = z + dz * timeRatio
+
+            let nextX = x,
+                nextY = y,
+                nextZ = z
+            if (true) {
+                //TODO: check collide
+                //not collide
+                nextX = newX
+                nextY = newY
+                nextZ = newZ
+            }
+            entity.keyframes.push([nextX, nextY, nextZ, t + timeStep])
+
+            if (dt <= TIME_STEP) {
+                return next(entity) //done
+            }
+            return next(entity, {
+                type: "precomputedOperation",
+                identifier: "moveToAndDodge",
+                parameters: [targetX, targetY, targetZ, dt - timeStep],
+            }) //schedule again
+            //TODO: somehow get the id from the transformation to here
         },
     },
 }
@@ -28,33 +81,13 @@ export const interpreterOptions: InterpreterOptions = {
             return { keyframes: [...value.keyframes], type: value.type }
         }
     },
-    comparePriority(e1, e2, e1Trans, e2Trans) {
+    comparePriority(e1, e2) {
         if (!isMotionEntity(e1) || !isMotionEntity(e2)) {
             return 0
         }
-        let addedCurrTime = 0
-        let addedListItemTime = 0
-        if (
-            typeof e1Trans === "object" &&
-            !Array.isArray(e1Trans) &&
-            e1Trans !== null &&
-            "type" in e1Trans &&
-            e1Trans.type == "precomputedOperation"
-        ) {
-            const oper = e1Trans as NestedPrecomputedOperation
-            addedCurrTime = oper.children[3]
-        }
-        if (
-            typeof e2Trans === "object" &&
-            !Array.isArray(e2Trans) &&
-            e2Trans !== null &&
-            "type" in e2Trans &&
-            e2Trans.type == "precomputedOperation"
-        ) {
-            const oper = e2Trans as NestedPrecomputedOperation
-            addedListItemTime = oper.children[3]
-        }
-        return e2.keyframes.at(-1)![3] + addedListItemTime - (e1.keyframes.at(-1)![3] + addedCurrTime)
+        const e1Time = e1.keyframes.at(-1)![3]
+        const e2Time = e2.keyframes.at(-1)![3]
+        return e2Time - e1Time
     },
     computeDurationMS: 1000,
     createValue({ type, x, y, z, time }) {
