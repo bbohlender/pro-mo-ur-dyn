@@ -19,11 +19,15 @@ import { Queue, QueueEntry } from "./queue.js"
 import murmurhash from "murmurhash"
 
 export type Operation = {
-    execute: (...parameters: ReadonlyArray<any>) => Array<any> | any
+    execute: (next: OperationNextCallback, ...parameters: ReadonlyArray<any>) => any
     includeThis: boolean
     defaultParameters: Array<() => NestedTransformation>
-    preComputeParameters?: boolean
 }
+
+export type OperationNextCallback = (
+    newRaw: any | Array<any>,
+    ...newTransformations: Array<NestedTransformation>
+) => any
 
 export type Operations = {
     [Name in string]: Operation
@@ -52,7 +56,7 @@ export type InterpreterOptions = Readonly<{
     /**
      * compares the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
      */
-    comparePriority: (v1: unknown, v2: unknown, v1Trans: unknown, v2Trans: unknown) => number
+    comparePriority: (v1: unknown, v2: unknown) => number
     createValue: (initialVariables: NestedDescription["initialVariables"]) => any
     cloneValue: (value: unknown) => unknown
     operations: Operations
@@ -103,10 +107,10 @@ export function interprete(
 
 function nextQueued(
     queue: Queue,
-    value: Value,
-    newRaw: any | Array<any> | undefined,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    value: Value,
+    newRaw: any | Array<any> | undefined,
     ...newTransformations: Array<NestedTransformation>
 ) {
     const currentEntry = queue.peek()
@@ -145,7 +149,7 @@ export function interpreteQueueRecursive(
     if (nextEntry == null) {
         return
     }
-    const next: NextCallback<void> = nextQueued.bind(null, queue)
+    const next: NextCallback<void> = nextQueued.bind(null, queue, descriptions, options)
 
     const startTime = new Date().getTime()
     const progressAtStart = options.getComputeProgress(nextEntry.value)
@@ -195,8 +199,6 @@ export function interpreteQueueRecursive(
 type NextCallback<R> = (
     value: Value,
     newRaw: any | Array<any> | undefined,
-    descriptions: NestedDescriptions,
-    options: InterpreterOptions,
     ...newTransformations: Array<NestedTransformation>
 ) => R
 
@@ -214,15 +216,15 @@ function interpreteTransformation<R>(
         case "operation":
             return interpreteOperation(value, transformation, descriptions, options, next)
         case "precomputedOperation":
-            return interpretePrecomputedOperation(value, transformation, descriptions, options, next)
+            return interpretePrecomputedOperation(value, transformation, options, next)
         case "raw":
-            return interpreteRaw(value, transformation, descriptions, options, next)
+            return interpreteRaw(value, transformation, next)
         case "sequential":
-            return interpreteSequential(value, transformation, descriptions, options, next)
+            return interpreteSequential(value, transformation, next)
         case "nounReference":
-            return interpreteNounReference(value, transformation, descriptions, options, next)
+            return interpreteNounReference(value, transformation, descriptions, next)
         case "this":
-            return interpreteThis(value, descriptions, options, next)
+            return interpreteThis(value, next)
         case "-()":
         case "!":
             return interpreteUnaryOperator(value, transformation, descriptions, options, next)
@@ -245,16 +247,22 @@ function interpreteTransformation<R>(
         case "switch":
             return interpreteSwitch(value, transformation, descriptions, options, next)
         case "getVariable":
-            return interpreteGetVariable(value, transformation, descriptions, options, next)
+            return interpreteGetVariable(value, transformation, next)
         case "setVariable":
             return interpreteSetVariable(value, transformation, descriptions, options, next)
         case "stochasticSwitch":
-            return interpreteStochasticSwitch(value, transformation, descriptions, options, next)
+            return interpreteStochasticSwitch(value, transformation, options, next)
     }
     throw new Error(`unknown transformation type "${transformation.type}"`)
 }
 
-const nextSynchronous: NextCallback<Value> = (value, newRaw, descriptions, options, ...newTransformations) => {
+const nextSynchronous = (
+    descriptions: NestedDescriptions,
+    options: InterpreterOptions,
+    value: Value,
+    newRaw: any | Array<any> | undefined,
+    ...newTransformations: Array<NestedTransformation>
+) => {
     if (Array.isArray(newRaw)) {
         throw new Error(`unable to compute parallel values in synchronous interpretation`)
     }
@@ -273,13 +281,18 @@ export function interpreteTransformationSynchronous(
     descriptions: NestedDescriptions,
     options: InterpreterOptions
 ): Value {
-    return interpreteTransformation(value, transformation, descriptions, options, nextSynchronous)
+    return interpreteTransformation(
+        value,
+        transformation,
+        descriptions,
+        options,
+        nextSynchronous.bind(null, descriptions, options)
+    )
 }
 
 function interpreteStochasticSwitch<R>(
     value: Value,
     transformation: NestedStochasticSwitch,
-    descriptions: NestedDescriptions,
     options: InterpreterOptions,
     next: NextCallback<R>
 ): R {
@@ -294,21 +307,15 @@ function interpreteStochasticSwitch<R>(
 
     options.listeners?.onStochasticSwitch?.(transformation, value, i)
 
-    return next(value, undefined, descriptions, options, transformation.children[i])
+    return next(value, undefined, transformation.children[i])
 }
 
-function interpreteGetVariable<R>(
-    value: Value,
-    transformation: NestedGetVariable,
-    descriptions: NestedDescriptions,
-    options: InterpreterOptions,
-    next: NextCallback<R>
-): R {
+function interpreteGetVariable<R>(value: Value, transformation: NestedGetVariable, next: NextCallback<R>): R {
     const variable = value.variables[transformation.identifier]
     if (variable == null) {
         throw new Error(`unknown variable "${transformation.identifier}"`)
     }
-    return next(value, variable, descriptions, options)
+    return next(value, variable)
 }
 
 function interpreteSetVariable<R>(
@@ -324,7 +331,7 @@ function interpreteSetVariable<R>(
         descriptions,
         options
     )
-    return next(value, undefined, descriptions, options)
+    return next(value, undefined)
 }
 
 function interpreteSwitch<R>(
@@ -343,7 +350,7 @@ function interpreteSwitch<R>(
     for (let i = 0; i < transformation.cases.length; i++) {
         const currenttransformation = transformation.cases[i]
         if (currenttransformation.includes(raw)) {
-            return next(value, undefined, descriptions, options, transformation.children[i + 1])
+            return next(value, undefined, transformation.children[i + 1])
         }
     }
     throw new Error(`no case matched`)
@@ -353,7 +360,6 @@ function interpreteNounReference<R>(
     value: Value,
     transformation: NestedNounReference,
     descriptions: NestedDescriptions,
-    options: InterpreterOptions,
     next: NextCallback<R>
 ): R {
     const description = descriptions[transformation.descriptionIdentifier]
@@ -363,7 +369,7 @@ function interpreteNounReference<R>(
             `unknown noun "${transformation.nounIdentifier}" from description "${transformation.descriptionIdentifier}"`
         )
     }
-    return next(value, undefined, descriptions, options, nounTransformation)
+    return next(value, undefined, nounTransformation)
 }
 
 function interpreteIf<R>(
@@ -380,20 +386,14 @@ function interpreteIf<R>(
         options
     )
     if (conditionOperatorValue.raw) {
-        return next(value, undefined, descriptions, options, transformation.children[1])
+        return next(value, undefined, transformation.children[1])
     } else {
-        return next(value, undefined, descriptions, options, transformation.children[2])
+        return next(value, undefined, transformation.children[2])
     }
 }
 
-function interpreteSequential<R>(
-    value: Value,
-    transformation: NestedSequantial,
-    descriptions: NestedDescriptions,
-    options: InterpreterOptions,
-    next: NextCallback<R>
-): R {
-    return next(value, undefined, descriptions, options, ...transformation.children)
+function interpreteSequential<R>(value: Value, transformation: NestedSequantial, next: NextCallback<R>): R {
+    return next(value, undefined, ...transformation.children)
 }
 
 function interpreteBinaryOperator<R>(
@@ -406,7 +406,7 @@ function interpreteBinaryOperator<R>(
     const [v1, v2] = transformation.children.map((child) =>
         interpreteTransformationSynchronous(clone(value, options), child, descriptions, options)
     )
-    return next(value, binaryOperations[transformation.type](v1.raw, v2.raw), descriptions, options)
+    return next(value, binaryOperations[transformation.type](v1.raw, v2.raw))
 }
 
 function interpreteOperation<R>(
@@ -421,29 +421,19 @@ function interpreteOperation<R>(
     if (operation == null) {
         throw new Error(`unknown operation "${transformation.identifier}"`)
     }
-    const parameters = transformation.children.map((child) =>
-        interpreteTransformationSynchronous(clone(value, options), child, descriptions, options)
-    )
+    const parameters = transformation.children
+        .map((child) => interpreteTransformationSynchronous(clone(value, options), child, descriptions, options))
+        .map(({ raw }) => raw)
 
     if (operation.includeThis) {
-        parameters.unshift(clone(value, options))
+        parameters.unshift(options.cloneValue(value.raw))
     }
-    if (operation.preComputeParameters) {
-        return next(value, value, descriptions, options, {
-            type: "precomputedOperation",
-            children: parameters.map((v) => v.raw),
-            identifier: transformation.identifier,
-            id: transformation.id,
-        })
-    }
-    const result = operation.execute(...parameters.map(({ raw }) => raw))
-    return next(value, result, descriptions, options)
+    return operation.execute(next.bind(null, value), ...parameters) as R
 }
 
 function interpretePrecomputedOperation<R>(
     value: Value,
     transformation: NestedPrecomputedOperation,
-    descriptions: NestedDescriptions,
     options: InterpreterOptions,
     next: NextCallback<R>
 ): R {
@@ -451,20 +441,11 @@ function interpretePrecomputedOperation<R>(
     if (operation == null) {
         throw new Error(`unknown operation "${transformation.identifier}"`)
     }
-    const parameters = transformation.children
-
-    const result = operation.execute(...parameters)
-    return next(value, result, descriptions, options)
+    return operation.execute(next.bind(null, value), ...transformation.parameters) as R
 }
 
-function interpreteRaw<R>(
-    value: Value,
-    transformation: ParsedRaw,
-    descriptions: NestedDescriptions,
-    options: InterpreterOptions,
-    next: NextCallback<R>
-): R {
-    return next(value, transformation.value, descriptions, options)
+function interpreteRaw<R>(value: Value, transformation: ParsedRaw, next: NextCallback<R>): R {
+    return next(value, transformation.value)
 }
 
 export const unaryOperations: { [Name in NestedUnaryOperator["type"]]: (value: any) => any } = {
@@ -485,7 +466,7 @@ function interpreteUnaryOperator<R>(
         descriptions,
         options
     )
-    return next(value, unaryOperations[transformation.type](parameter.raw), descriptions, options)
+    return next(value, unaryOperations[transformation.type](parameter.raw))
 }
 
 export const binaryOperations: { [Name in NestedBinaryOperator["type"]]: (v1: any, v2: any) => any } = {
@@ -504,13 +485,8 @@ export const binaryOperations: { [Name in NestedBinaryOperator["type"]]: (v1: an
     "!=": (v1, v2) => v1 != v2,
 }
 
-function interpreteThis<R>(
-    value: Value,
-    descriptions: NestedDescriptions,
-    options: InterpreterOptions,
-    next: NextCallback<R>
-): R {
-    return next(value, undefined, descriptions, options)
+function interpreteThis<R>(value: Value, next: NextCallback<R>): R {
+    return next(value, undefined)
 }
 
 export const _32bit_max_int = Math.pow(2, 32)
