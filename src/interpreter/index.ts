@@ -13,6 +13,7 @@ import {
     NestedSwitch,
     NestedUnaryOperator,
     ParsedRaw,
+    NestedPrecomputedOperation,
 } from "../index.js"
 import { Queue, QueueEntry } from "./queue.js"
 import murmurhash from "murmurhash"
@@ -21,6 +22,7 @@ export type Operation = {
     execute: (...parameters: ReadonlyArray<any>) => Array<any> | any
     includeThis: boolean
     defaultParameters: Array<() => NestedTransformation>
+    preComputeParameters?: boolean
 }
 
 export type Operations = {
@@ -50,7 +52,7 @@ export type InterpreterOptions = Readonly<{
     /**
      * compares the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
      */
-    comparePriority: (v1: unknown, v2: unknown) => number
+    comparePriority: (v1: unknown, v2: unknown, v1Trans: unknown, v2Trans: unknown) => number
     createValue: (initialVariables: NestedDescription["initialVariables"]) => any
     cloneValue: (value: unknown) => unknown
     operations: Operations
@@ -211,6 +213,8 @@ function interpreteTransformation<R>(
     switch (transformation.type) {
         case "operation":
             return interpreteOperation(value, transformation, descriptions, options, next)
+        case "precomputedOperation":
+            return interpretePrecomputedOperation(value, transformation, descriptions, options, next)
         case "raw":
             return interpreteRaw(value, transformation, descriptions, options, next)
         case "sequential":
@@ -424,8 +428,32 @@ function interpreteOperation<R>(
     if (operation.includeThis) {
         parameters.unshift(clone(value, options))
     }
-
+    if (operation.preComputeParameters) {
+        return next(value, value, descriptions, options, {
+            type: "precomputedOperation",
+            children: parameters.map((v) => v.raw),
+            identifier: transformation.identifier,
+            id: transformation.id,
+        })
+    }
     const result = operation.execute(...parameters.map(({ raw }) => raw))
+    return next(value, result, descriptions, options)
+}
+
+function interpretePrecomputedOperation<R>(
+    value: Value,
+    transformation: NestedPrecomputedOperation,
+    descriptions: NestedDescriptions,
+    options: InterpreterOptions,
+    next: NextCallback<R>
+): R {
+    const operation = options.operations[transformation.identifier]
+    if (operation == null) {
+        throw new Error(`unknown operation "${transformation.identifier}"`)
+    }
+    const parameters = transformation.children
+
+    const result = operation.execute(...parameters)
     return next(value, result, descriptions, options)
 }
 
