@@ -56,7 +56,6 @@ Description {
         ).to.not.throw()
     }).timeout(500)
 
-
     it("should flatten and nest descriptions", () => {
         const nestedDescriptions = parse(`
         Description {
@@ -95,5 +94,4 @@ Description {
         }`)
         expect(nestAST(flattenAST(nestedDescriptions), false)).to.deep.equal(nestedDescriptions)
     })
-
 })

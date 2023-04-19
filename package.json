@@ -10,7 +10,8 @@
     "fix": "run-s fix:prettier fix:eslint",
     "fix:prettier": "prettier --write 'src/**/*.{ts,tsx}'",
     "fix:eslint": "eslint src --fix",
-    "test": "nyc mocha ./tests/*.spec.ts --timeout 15000"
+    "test": "nyc mocha ./tests/*.spec.ts --timeout 15000",
+    "test:interpreter": "nyc mocha ./tests/interpreter.spec.ts --timeout 15000"
   },
   "author": "",
   "license": "ISC",

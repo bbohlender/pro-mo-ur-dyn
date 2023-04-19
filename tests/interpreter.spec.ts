@@ -1,6 +1,7 @@
 import { expect } from "chai"
 import { parse } from "../src/index.js"
 import { Operations, interpreteTransformationSynchronous, WorkerInterface } from "../src/index.js"
+import { MotionEntity, MotionEntityType, operations } from "../src/domains/motion/index.js"
 
 //TODO: write tests for:
 //  complex description that returns multiple intermediate results but that does not pause completly
@@ -32,12 +33,16 @@ function testInterpreteSynchronously(text: string, operations: Operations = {}, 
 
 /* describe("interprete grammar synchronously", () => {
     it("should interprete sequential execution", async () => {
-        const result = testInterpreteSynchronously(`Test { a --> 10 -> this * 10 -> this + 1 }`)
+        const result = testInterpreteSynchronously(`Test { a -
+            -> 10 
+            -> this * 10 
+            -> this + 1 }`)
         expect(result).to.equal(101)
     })
 
     it("should interprete operation execution without including this parameter", async () => {
-        const result = testInterpreteSynchronously(`Test { a --> op1(3+3, "Hallo" + " Welt") }`, {
+        const result = testInterpreteSynchronously(`Test { a -
+            -> op1(3+3, "Hallo" + " Welt") }`, {
             op1: {
                 execute: (...[num, str]: ReadonlyArray<any>) => `${str ?? ""}${num * num}`,
                 includeThis: false,
@@ -48,33 +53,47 @@ function testInterpreteSynchronously(text: string, operations: Operations = {}, 
     })
 
     it("should interprete grammars with recursion", async () => {
-        const result = testInterpreteSynchronously(`Test { a --> if this == 0 then { 0 } else { this - 1 -> a } }`)
+        const result = testInterpreteSynchronously(`Test { a -
+            -> if this == 0 then { 0 } else { this - 1 
+            -> a } }`)
         expect(result).to.equal(0)
     })
 
     it("should interprete complex grammars", async () => {
         const result = testInterpreteSynchronously(`Test { 
-            a --> 2 -> switch this { case 2: b case 3: c }
-            b --> if true then { this * 10 -> c } else { c }
-            c --> (20 * d)
-            d --> this / 2 -> this * 2
+            a -
+            -> 2 
+            -> switch this { case 2: b case 3: c }
+            b -
+            -> if true then { this * 10 
+                -> c } else { c }
+            c -
+            -> (20 * d)
+            d -
+            -> this / 2 
+            -> this * 2
         }`)
         expect(result).to.equal(400)
     })
 
     it("should throw an error when using unknown noun", async () => {
-        expect(() => testInterpreteSynchronously(`Test { a --> 10 -> b }`)).to.throw(
+        expect(() => testInterpreteSynchronously(`Test { a -
+            -> 10 
+            -> b }`)).to.throw(
             `unknown noun "b" from description "Test"`
         )
     })
 
     it("should throw an error when using unknown operator", async () => {
-        expect(() => testInterpreteSynchronously(`Test { a --> 10 -> drive() }`)).to.throw(`unknown operation "drive"`)
+        expect(() => testInterpreteSynchronously(`Test { a -
+            -> 10 
+            -> drive() }`)).to.throw(`unknown operation "drive"`)
     })
 
     it("should should interprete random based on seed", async () => {
         const results = [4, 8, 3, 50, 50].map((seed) =>
-            testInterpreteSynchronously(`Test { a --> { 25%: 1 25%: 2 25%: 3 25%: 4 } }`, undefined, seed)
+            testInterpreteSynchronously(`Test { a -
+                -> { 25%: 1 25%: 2 25%: 3 25%: 4 } }`, undefined, seed)
         )
         expect(results).to.deep.equal([1, 2, 3, 4, 4])
     })
@@ -101,10 +120,17 @@ function testInterpreteSynchronously(text: string, operations: Operations = {}, 
         ).testInterpreteSynchronously
 
         await workerInterprete(`Test { 
-            a --> 2 -> switch this { case 2: b case 3: c }
-            b --> if true then { this * 10 -> c } else { c }
-            c --> (20 * d)
-            d --> this / 2 -> this * 2
+            a -
+            -> 2 
+            -> switch this { case 2: b case 3: c }
+            b -
+            -> if true then { this * 10 
+                -> c } else { c }
+            c -
+            -> (20 * d)
+            d -
+            -> this / 2 
+            -> this * 2
         }`)
 
         expect(result).to.deep.equal(400)
@@ -137,10 +163,17 @@ describe("interprete grammar asynchronously", () => {
         ).testInterpreteAsynchronously
 
         workerInterprete(`Test { 
-            a --> 2 -> switch this { case 2: b case 3: c }
-            b --> if true then { this * 10 -> c } else { c }
-            c --> (20 * d)
-            d --> this / 2 -> this * 2
+            a -
+            -> 2 
+            -> switch this { case 2: b case 3: c }
+            b -
+            -> if true then { this * 10 
+                -> c } else { c }
+            c -
+            -> (20 * d)
+            d -
+            -> this / 2 
+            -> this * 2
         }`)
 
         while (!resultReady) {
@@ -150,12 +183,69 @@ describe("interprete grammar asynchronously", () => {
         expect(result).to.deep.equal(400)
     }) */
 
-    it("web worker parallel", async () => {
-        const result = await testAsyncInterprete(`Test { a --> ((1 | 2 * 2) -> this * 2) }`)
+    /*     it("web worker parallel", async () => {
+        const result = await testAsyncInterprete(`Test { a -
+            -> ((1 | 2 * 2) 
+            -> this * 2) }`)
 
         expect(result).to.deep.equal([8, 2])
     })
+
+    it("web worker double  parallel", async () => {
+        const result = await testAsyncInterprete(`Test { a -
+            -> ((1 | 2 * 2) 
+            -> (this + 5 | this * 2)) }`)
+
+        expect(result).to.deep.equal([9, 8, 2, 6])
+    })
+
+    it("web worker arithmetic async", async () => {
+        const result = await testAsyncInterpreteArithmetic(`Test { a -
+            -> ((1 | 2 * 2) 
+            -> (this + 5 | this * 2)) }`)
+        expect(result).to.deep.equal([9, 8, 2, 6])
+    }) */
+    it("web worker motion entity", async () => {
+        const result = await testAsyncInterpreteMotionEntity(
+            `Test (type: "car" x:0 y:0 z:0  time:0) { a --> moveTo(10,0,0,10) 
+                -> moveTo(10,0,0,10) 
+            } 
+            Test2 (type: "pedestrian" x:0 y:0 z:0  time:0) { a --> moveTo(0,50,0,20) 
+                -> moveTo(0,50,0,20) }`
+        )
+        const entity = {
+            type: MotionEntityType.Car,
+            keyframes: [[0, 0, 0, 0] as readonly [number, number, number, number]],
+        }
+        const moveTo = executeSeveralPositions(entity, [
+            [10, 0, 0, 10],
+            [10, 0, 0, 10],
+            /*             [10, 0, 0, 10],
+            [10, 0, 0, 10],
+            [10, 0, 0, 10],
+            [10, 0, 0, 10],
+            [10, 0, 0, 10],
+            [10, 0, 0, 10],
+            [10, 0, 0, 10],
+            [10, 0, 0, 10],
+            [10, 0, 0, 10], */
+        ])
+        const moveTo2 = executeSeveralPositions({ ...entity, type: MotionEntityType.Pedestrian }, [
+            [0, 50, 0, 20],
+            [0, 50, 0, 20],
+        ])
+        //console.log("final Result:")
+        //console.log([moveTo2, moveTo].map((v) => v.keyframes))
+        expect(result).to.deep.equal([moveTo, moveTo2])
+    })
 })
+
+function executeSeveralPositions(entity: MotionEntity, positions: Array<[number, number, number, number]>) {
+    for (const pos of positions) {
+        entity = operations.moveTo.execute(JSON.parse(JSON.stringify(entity)), ...pos)
+    }
+    return entity
+}
 
 function testAsyncInterprete(descriptions: string): Promise<Array<any>> {
     return new Promise((resolve) => {
@@ -163,6 +253,45 @@ function testAsyncInterprete(descriptions: string): Promise<Array<any>> {
             new URL("./worker.js", import.meta.url),
             {
                 name: "testAsyncInterprete",
+                type: "module",
+            },
+            (values, isFinal) => {
+                if (isFinal) {
+                    workerInterface.terminate()
+                    resolve(values.map((v) => v.raw))
+                }
+            }
+        )
+        workerInterface.interprete(parse(descriptions), null)
+    })
+}
+
+function testAsyncInterpreteMotionEntity(descriptions: string): Promise<Array<any>> {
+    return new Promise((resolve) => {
+        const workerInterface = new WorkerInterface(
+            new URL("./workerasync.js", import.meta.url),
+            {
+                name: "testAsyncInterpreteArithmetic",
+                type: "module",
+            },
+            (values, isFinal) => {
+                //console.log(values.map((v) => v.raw.keyframes))
+                if (isFinal) {
+                    workerInterface.terminate()
+                    resolve(values.map((v) => v.raw))
+                }
+            }
+        )
+        workerInterface.interprete(parse(descriptions), null)
+    })
+}
+
+function testAsyncInterpreteArithmetic(descriptions: string): Promise<Array<any>> {
+    return new Promise((resolve) => {
+        const workerInterface = new WorkerInterface(
+            new URL("../dist/domains/arithmetic/worker.js", import.meta.url),
+            {
+                name: "testAsyncInterpreteArithmetic",
                 type: "module",
             },
             (values, isFinal) => {

@@ -87,10 +87,7 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                                             },
                                             {
                                                 type: "sequential",
-                                                children: [
-                                                    { type: "getVariable", identifier: "x" },
-                                                    { type: "null" },
-                                                ],
+                                                children: [{ type: "getVariable", identifier: "x" }, { type: "null" }],
                                             },
                                         ],
                                     },
@@ -130,5 +127,32 @@ export const parsedAndUnparsedGrammarPairs: Array<{
             },
         },
         unparsed: `Test (var: "123") { a --> { 40%: 1 60%: 2 * 3 } }`,
+    },
+    {
+        parsed: {
+            Test: {
+                initialVariables: {
+                    type: "0",
+                    x: 0,
+                    y: 0,
+                    z: 0,
+                    time: 0,
+                },
+                nouns: {
+                    a: {
+                        type: "operation",
+                        identifier: "moveTo",
+                        children: [
+                            { type: "raw", value: 10 },
+                            { type: "raw", value: 0 },
+                            { type: "raw", value: 0 },
+                            { type: "raw", value: 10 },
+                        ],
+                    },
+                },
+                rootNounIdentifier: "a",
+            },
+        },
+        unparsed: `Test (type: "0" x:0 y:0 z:0  time:0) { a --> moveTo(10,0,0,10) }`,
     },
 ]
