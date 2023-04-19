@@ -1,14 +1,15 @@
+import { NestedPrecomputedOperation } from "../../index.js"
 import { InterpreterOptions, OperationNextCallback, Operations } from "../../interpreter/index.js"
 
 const TIME_STEP = 100 //ms
 const RADIUS = 0.1 //meter
 
-const operations: Operations = {
+export const operations: Operations = {
     moveTo: {
         defaultParameters: [],
         includeThis: true,
         execute: (next: OperationNextCallback, entity: MotionEntity, x: number, y: number, z: number, dt: number) => {
-            const t = entity.keyframes.at(-1)![3]
+            const t = entity.keyframes[entity.keyframes.length - 1]![3]
             entity.keyframes.push([x, y, z, t + dt])
             return next(entity)
         },
@@ -24,7 +25,7 @@ const operations: Operations = {
             dz: number,
             dt: number
         ) => {
-            const [x, y, z, t] = entity.keyframes.at(-1)!
+            const [x, y, z, t] = entity.keyframes[entity.keyframes.length - 1]!
             entity.keyframes.push([x + dx, y + dy, z + dz, t + dt])
             return next(entity)
         },
@@ -81,13 +82,25 @@ export const interpreterOptions: InterpreterOptions = {
             return { keyframes: [...value.keyframes], type: value.type }
         }
     },
-    comparePriority(e1, e2) {
+    comparePriority(e1, e2, e1Trans, e2Trans) {
         if (!isMotionEntity(e1) || !isMotionEntity(e2)) {
             return 0
         }
-        const e1Time = e1.keyframes.at(-1)![3]
-        const e2Time = e2.keyframes.at(-1)![3]
-        return e2Time - e1Time
+        let addedCurrTime = 0
+        let addedListItemTime = 0
+        if (isNestedPrecomputedOperation(e1Trans)) {
+            const oper = e1Trans as NestedPrecomputedOperation
+            addedCurrTime = oper.parameters[3]
+        }
+        if (isNestedPrecomputedOperation(e2Trans)) {
+            const oper = e2Trans as NestedPrecomputedOperation
+            addedListItemTime = oper.parameters[3]
+        }
+        return (
+            e1.keyframes[e1.keyframes.length - 1]![3] +
+            addedCurrTime -
+            (e2.keyframes[e2.keyframes.length - 1]![3] + addedListItemTime)
+        )
     },
     computeDurationMS: 1000,
     createValue({ type, x, y, z, time }) {
@@ -100,7 +113,7 @@ export const interpreterOptions: InterpreterOptions = {
         if (!isMotionEntity(entity)) {
             return 0
         }
-        return entity.keyframes.at(-1)![3]
+        return entity.keyframes[entity.keyframes.length - 1][3]
     },
     operations,
     shouldInterrrupt(startProgress, currentProgress) {
@@ -130,4 +143,14 @@ export type MotionEntity = {
 
 function isMotionEntity(value: unknown): value is MotionEntity {
     return typeof value === "object" && value != null && "keyframes" in value
+}
+
+function isNestedPrecomputedOperation(value: unknown): value is NestedPrecomputedOperation {
+    return (
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        value !== null &&
+        "type" in value &&
+        value.type == "precomputedOperation"
+    )
 }

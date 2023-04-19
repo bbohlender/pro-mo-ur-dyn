@@ -56,7 +56,7 @@ export type InterpreterOptions = Readonly<{
     /**
      * compares the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
      */
-    comparePriority: (v1: unknown, v2: unknown) => number
+    comparePriority: (v1: unknown, v2: unknown, v1Tr: unknown, v2Tr: unknown) => number
     createValue: (initialVariables: NestedDescription["initialVariables"]) => any
     cloneValue: (value: unknown) => unknown
     operations: Operations
