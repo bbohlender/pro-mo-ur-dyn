@@ -46,15 +46,15 @@ const lexer = moo.compile({
 %}
 @lexer lexer
 
-DescriptionsDefinition  ->  ws DescriptionDefinition:+                                         {% ([, descriptions]) => descriptions.reduce((prev: any, [identifier, description]: [string, any]) => { prev[identifier] = description; return prev }, {}) %}
+DescriptionsDefinition  ->  ws DescriptionDefinition:*                                      {% ([, descriptions]) => descriptions.reduce((prev: any, [identifier, description]: [string, any]) => { prev[identifier] = description; return prev }, {}) %}
 
 DescriptionDefinition   ->  %identifier ws (%openBracket ws InitialVariables %closedBracket ws):? %openCurlyBracket ws NounDefinitions %closedCurlyBracket ws {% ([{ value: identifier },,initialVariables,,,nouns]) => [identifier, { initialVariables: initialVariables?.[2] ?? {}, nouns, rootNounIdentifier: Object.keys(nouns)[0] }] %}
 
 InitialVariables        ->  InitialVariable:*                                               {% ([initialVariables]) => initialVariables.reduce((prev: any, [identifier, value]: [string, any]) => { prev[identifier] = value; return prev }, {}) %}
 InitialVariable         ->  %identifier ws %colon ws Constant ws                            {% ([{ value:identifier },,,,value]) => [identifier, value] %}
 
-NounDefinitions         ->  NounDefinition:*                                                {% ([nouns]) => nouns.reduce((prev: any, [identifier, transformation]: [string, any]) => { prev[identifier] = { transformation }; return prev }, {}) %}
-NounDefinition          ->  %identifier ws %longArrow ws Transformation %ws                 {% ([{ value: identifier },,,,transformation]) => [identifier, transformation] %}
+NounDefinitions         ->  (NounDefinition %ws):* NounDefinition ws                        {% ([nounsWithWhitespace, noun]) => [...nounsWithWhitespace.map(([noun]: [string, any]) => noun), noun].reduce((prev: any, [identifier, transformation]: [string, any]) => { prev[identifier] = { transformation }; return prev }, {}) %}
+NounDefinition          ->  %identifier ws %longArrow ws Transformation                     {% ([{ value: identifier },,,,transformation]) => [identifier, transformation] %}
 
 Transformation          ->  ParallelTransformations                                         {% ([transformation]) => transformation %}
 

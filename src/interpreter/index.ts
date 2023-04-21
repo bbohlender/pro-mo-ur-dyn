@@ -135,6 +135,13 @@ function nextQueued(
         queue.pop()
         currentEntry.value.raw = newRaw
         queue.push(currentEntry)
+        return
+    }
+
+    if(currentEntry.stack.length === 0) {
+        queue.pop()
+        queue.push(currentEntry)
+        return
     }
 }
 

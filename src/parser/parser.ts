@@ -9,8 +9,8 @@ declare var closedBracket: any;
 declare var openCurlyBracket: any;
 declare var closedCurlyBracket: any;
 declare var colon: any;
-declare var longArrow: any;
 declare var ws: any;
+declare var longArrow: any;
 declare var parallel: any;
 declare var arrow: any;
 declare var or: any;
@@ -117,7 +117,7 @@ interface Grammar {
 const grammar: Grammar = {
   Lexer: lexer,
   ParserRules: [
-    {"name": "DescriptionsDefinition$ebnf$1", "symbols": ["DescriptionDefinition"]},
+    {"name": "DescriptionsDefinition$ebnf$1", "symbols": []},
     {"name": "DescriptionsDefinition$ebnf$1", "symbols": ["DescriptionsDefinition$ebnf$1", "DescriptionDefinition"], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "DescriptionsDefinition", "symbols": ["ws", "DescriptionsDefinition$ebnf$1"], "postprocess": ([, descriptions]) => descriptions.reduce((prev: any, [identifier, description]: [string, any]) => { prev[identifier] = description; return prev }, {})},
     {"name": "DescriptionDefinition$ebnf$1$subexpression$1", "symbols": [(lexer.has("openBracket") ? {type: "openBracket"} : openBracket), "ws", "InitialVariables", (lexer.has("closedBracket") ? {type: "closedBracket"} : closedBracket), "ws"]},
@@ -129,9 +129,10 @@ const grammar: Grammar = {
     {"name": "InitialVariables", "symbols": ["InitialVariables$ebnf$1"], "postprocess": ([initialVariables]) => initialVariables.reduce((prev: any, [identifier, value]: [string, any]) => { prev[identifier] = value; return prev }, {})},
     {"name": "InitialVariable", "symbols": [(lexer.has("identifier") ? {type: "identifier"} : identifier), "ws", (lexer.has("colon") ? {type: "colon"} : colon), "ws", "Constant", "ws"], "postprocess": ([{ value:identifier },,,,value]) => [identifier, value]},
     {"name": "NounDefinitions$ebnf$1", "symbols": []},
-    {"name": "NounDefinitions$ebnf$1", "symbols": ["NounDefinitions$ebnf$1", "NounDefinition"], "postprocess": (d) => d[0].concat([d[1]])},
-    {"name": "NounDefinitions", "symbols": ["NounDefinitions$ebnf$1"], "postprocess": ([nouns]) => nouns.reduce((prev: any, [identifier, transformation]: [string, any]) => { prev[identifier] = { transformation }; return prev }, {})},
-    {"name": "NounDefinition", "symbols": [(lexer.has("identifier") ? {type: "identifier"} : identifier), "ws", (lexer.has("longArrow") ? {type: "longArrow"} : longArrow), "ws", "Transformation", (lexer.has("ws") ? {type: "ws"} : ws)], "postprocess": ([{ value: identifier },,,,transformation]) => [identifier, transformation]},
+    {"name": "NounDefinitions$ebnf$1$subexpression$1", "symbols": ["NounDefinition", (lexer.has("ws") ? {type: "ws"} : ws)]},
+    {"name": "NounDefinitions$ebnf$1", "symbols": ["NounDefinitions$ebnf$1", "NounDefinitions$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "NounDefinitions", "symbols": ["NounDefinitions$ebnf$1", "NounDefinition", "ws"], "postprocess": ([nounsWithWhitespace, noun]) => [...nounsWithWhitespace.map(([noun]: [string, any]) => noun), noun].reduce((prev: any, [identifier, transformation]: [string, any]) => { prev[identifier] = { transformation }; return prev }, {})},
+    {"name": "NounDefinition", "symbols": [(lexer.has("identifier") ? {type: "identifier"} : identifier), "ws", (lexer.has("longArrow") ? {type: "longArrow"} : longArrow), "ws", "Transformation"], "postprocess": ([{ value: identifier },,,,transformation]) => [identifier, transformation]},
     {"name": "Transformation", "symbols": ["ParallelTransformations"], "postprocess": ([transformation]) => transformation},
     {"name": "ParallelTransformations$ebnf$1", "symbols": ["ParallelTransformation"]},
     {"name": "ParallelTransformations$ebnf$1", "symbols": ["ParallelTransformations$ebnf$1", "ParallelTransformation"], "postprocess": (d) => d[0].concat([d[1]])},

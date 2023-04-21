@@ -7,7 +7,7 @@ const helperVector = new Vector3()
  * backwards search for position at time
  */
 export function getEntityPositionAt(keyframes: Array<Keyframe>, time: number, target: Vector3): boolean {
-    if (keyframes.length === 0) {
+    if (keyframes.length < 2) {
         return false
     }
     let index = keyframes.length - 2
