@@ -1,43 +1,54 @@
-import { KeyboardEvent } from "react"
-import { ErrorMessage } from "../error-message"
-import { useBaseStore } from "../global"
-import { EditIcon } from "../icons/edit"
+import { HTMLProps, KeyboardEvent, useEffect, useMemo, useState } from "react"
+import { useStore } from "../state/store.js"
+import { NestedDescriptions, parse } from "pro-3d-video"
+import { PencilSquareIcon, ExclamationCircleIcon } from "@heroicons/react/20/solid"
+import { Panel } from "./panel.js"
 
 export function TextEditor() {
-    const store = useBaseStore()
-    const text = store((state) => (state.type === "tui" ? state.text : undefined))
-    const error = store((state) => (state.type === "tui" && !state.correct ? state.error : undefined))
+    const [text, setText] = useState("")
 
-    if (text == null && error == null) {
-        return null
-    }
+    useEffect(() => {
+        useStore.subscribe((state, prevState) => {
+            if (state.descriptions != prevState.descriptions) {
+                //TODO: set text
+            }
+        })
+    }, [])
+
+    const parseResult = useMemo<{ result: NestedDescriptions } | { error: string }>(() => {
+        try {
+            return { result: parse(text) }
+        } catch (error: any) {
+            return { error: error.message }
+        }
+    }, [text])
 
     return (
-        <div className="d-flex position-relative flex-grow-1">
+        <Panel className="flex relative p-3">
             <textarea
                 autoFocus
-                style={{ resize: "none", outline: 0, tabSize: 2 }}
+                style={{ width: 260, resize: "none", outline: 0, tabSize: 2 }}
                 value={text}
-                onKeyDown={(e) => onKeyDown(e, store.getState().setText)}
                 spellCheck={false}
-                onChange={(e) => store.getState().setText(e.target.value)}
-                className="bg-transparent p-3 border-0 flex-basis-0 flex-grow-1 text-light"
+                onKeyDown={(e) => onKeyDown(e, setText)}
+                onChange={(e) => setText(e.target.value)}
+                className="text-slate-950 bg-transparent p-3 border-0 flex-basis-0 flex-grow"
             />
-            {error == null ? (
-                <button
-                    className="d-flex align-items-center btn btn-sm btn-primary"
-                    style={{ position: "absolute", right: "1rem", bottom: "1rem" }}
-                    onClick={() => store.getState().setType("gui")}>
-                    <EditIcon />
-                </button>
-            ) : (
+            {"error" in parseResult ? (
                 <ErrorMessage
-                    style={{ position: "fixed", bottom: "1rem", right: "1rem" }}
+                    style={{ position: "absolute", bottom: "1rem", left: "1rem", right: "1rem" }}
                     align="right"
-                    message={error}
+                    message={parseResult.error}
                 />
+            ) : (
+                <button
+                    className="btn p-2 aspect-square btn-primary rounded-full flex items-center"
+                    style={{ position: "absolute", right: "1rem", bottom: "1rem" }}
+                    onClick={() => useStore.getState().replaceDescriptions(parseResult.result)}>
+                    <PencilSquareIcon />
+                </button>
             )}
-        </div>
+        </Panel>
     )
 }
 
@@ -60,4 +71,40 @@ function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>, setText: (text: string
         // prevent the focus lose
         return false
     }
+}
+
+export function ErrorMessage({
+    align,
+    message,
+    className,
+    ...rest
+}: HTMLProps<HTMLDivElement> & { align: "right" | "left"; message: string }) {
+    const [open, setOpen] = useState(false)
+    return (
+        <div
+            {...rest}
+            className={`${className} flex justify-end flex-column ${align === "left" ? "items-start" : "items-end"}`}>
+            {open && (
+                <div
+                    style={{
+                        overflowY: "auto",
+                        fontSize: "0.8rem",
+                        overflowX: "hidden",
+                        maxWidth: "20rem",
+                        maxHeight: "8rem",
+                        whiteSpace: "pre-line",
+                        wordWrap: "break-word",
+                        bottom: 52,
+                    }}
+                    className="rounded absolute mb-2 p-2 bg-error text-slate-50">
+                    {message}
+                </div>
+            )}
+            <div
+                onClick={() => setOpen((open) => !open)}
+                className="btn p-2 aspect-square btn-error rounded-full flex items-center">
+                <ExclamationCircleIcon />
+            </div>
+        </div>
+    )
 }

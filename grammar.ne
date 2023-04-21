@@ -53,7 +53,7 @@ DescriptionDefinition   ->  %identifier ws (%openBracket ws InitialVariables %cl
 InitialVariables        ->  InitialVariable:*                                               {% ([initialVariables]) => initialVariables.reduce((prev: any, [identifier, value]: [string, any]) => { prev[identifier] = value; return prev }, {}) %}
 InitialVariable         ->  %identifier ws %colon ws Constant ws                            {% ([{ value:identifier },,,,value]) => [identifier, value] %}
 
-NounDefinitions         ->  NounDefinition:*                                                {% ([nouns]) => nouns.reduce((prev: any, [identifier, transformation]: [string, any]) => { prev[identifier] = transformation; return prev }, {}) %}
+NounDefinitions         ->  NounDefinition:*                                                {% ([nouns]) => nouns.reduce((prev: any, [identifier, transformation]: [string, any]) => { prev[identifier] = { transformation }; return prev }, {}) %}
 NounDefinition          ->  %identifier ws %longArrow ws Transformation %ws                 {% ([{ value: identifier },,,,transformation]) => [identifier, transformation] %}
 
 Transformation          ->  ParallelTransformations                                         {% ([transformation]) => transformation %}

@@ -10,10 +10,10 @@ import { Operations, interpreteTransformationSynchronous, WorkerInterface } from
 function testInterpreteSynchronously(text: string, operations: Operations = {}, seed?: number): any {
     const descriptions = parse(text)
     const [description] = Object.values(descriptions)
-    const rootTransformation = description.nouns[description.rootNounIdentifier]
+    const rootNoun = description.nouns[description.rootNounIdentifier]
     const { raw } = interpreteTransformationSynchronous(
         { raw: 1, index: [], variables: {} },
-        rootTransformation,
+        rootNoun.transformation,
         descriptions,
         {
             cloneValue: (v) => v,
@@ -153,7 +153,7 @@ describe("interprete grammar asynchronously", () => {
     it("web worker parallel", async () => {
         const result = await testAsyncInterprete(`Test { a --> ((1 | 2 * 2) -> this * 2) }`)
 
-        expect(result).to.deep.equal([8, 2])
+        expect(result).to.deep.equal([2, 8])
     })
 })
 

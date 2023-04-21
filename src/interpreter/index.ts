@@ -19,7 +19,7 @@ import { Queue, QueueEntry } from "./queue.js"
 import murmurhash from "murmurhash"
 
 export type Operation = {
-    execute: (next: OperationNextCallback, ...parameters: ReadonlyArray<any>) => any
+    execute: (next: OperationNextCallback, astId: string, ...parameters: ReadonlyArray<any>) => any
     includeThis: boolean
     defaultParameters: Array<() => NestedTransformation>
 }
@@ -57,7 +57,7 @@ export type InterpreterOptions = Readonly<{
      * compares the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
      */
     comparePriority: (v1: unknown, v2: unknown) => number
-    createValue: (initialVariables: NestedDescription["initialVariables"]) => any
+    createValue: (initialVariables: NestedDescription["initialVariables"], astId: string) => any
     cloneValue: (value: unknown) => unknown
     operations: Operations
     computeDurationMS: number
@@ -86,17 +86,17 @@ export function interprete(
     const descriptionsEntries = Object.entries(descriptions)
     for (let i = 0; i < descriptionsEntries.length; i++) {
         const [identifier, { initialVariables, rootNounIdentifier, nouns }] = descriptionsEntries[i]
-        const rootTransformation = nouns[rootNounIdentifier]
-        if (rootTransformation == null) {
+        const noun = nouns[rootNounIdentifier]
+        if (noun == null) {
             throw new Error(`unknown noun "${rootNounIdentifier}" at description "${identifier}"`)
         }
         queue.push({
             value: {
                 index: [i],
-                raw: options.createValue(initialVariables),
+                raw: options.createValue(initialVariables, noun.astId!),
                 variables: initialVariables,
             },
-            stack: [rootTransformation],
+            stack: [noun.transformation],
         })
     }
     interpreteQueueRecursive(queue, descriptions, options, references, publishResult)
@@ -363,13 +363,13 @@ function interpreteNounReference<R>(
     next: NextCallback<R>
 ): R {
     const description = descriptions[transformation.descriptionIdentifier]
-    const nounTransformation = description?.nouns[transformation.nounIdentifier]
-    if (nounTransformation == null) {
+    const noun = description?.nouns[transformation.nounIdentifier]
+    if (noun == null) {
         throw new Error(
             `unknown noun "${transformation.nounIdentifier}" from description "${transformation.descriptionIdentifier}"`
         )
     }
-    return next(value, undefined, nounTransformation)
+    return next(value, undefined, noun.transformation)
 }
 
 function interpreteIf<R>(
@@ -428,7 +428,7 @@ function interpreteOperation<R>(
     if (operation.includeThis) {
         parameters.unshift(options.cloneValue(value.raw))
     }
-    return operation.execute(next.bind(null, value), ...parameters) as R
+    return operation.execute(next.bind(null, value), transformation.astId!, ...parameters) as R
 }
 
 function interpretePrecomputedOperation<R>(
@@ -441,7 +441,7 @@ function interpretePrecomputedOperation<R>(
     if (operation == null) {
         throw new Error(`unknown operation "${transformation.identifier}"`)
     }
-    return operation.execute(next.bind(null, value), ...transformation.parameters) as R
+    return operation.execute(next.bind(null, value), transformation.astId!, ...transformation.parameters) as R
 }
 
 function interpreteRaw<R>(value: Value, transformation: ParsedRaw, next: NextCallback<R>): R {

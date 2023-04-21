@@ -1,68 +1,104 @@
 import { useFrame } from "@react-three/fiber"
-import { useMemo, useRef } from "react"
-import { MotionEntity, MotionEntityType } from "pro-3d-video/dist/domains/motion/index.js"
-import { BoxGeometry, Group, InstancedMesh, Matrix4, MeshPhongMaterial, Quaternion, Vector3 } from "three"
-
-const entities: Array<MotionEntity & { index?: number }> = [
-    {
-        type: MotionEntityType.Pedestrian,
-        keyframes: [
-            [0, 0, 0, 0],
-            [1, 0, 1, 1],
-            [2, 0, 0, 2],
-            [0, 0, 0, 3],
-        ],
-    },
-]
-
-const duration = 3
-let startTime = performance.now() / 1000
+import { useEffect, useRef } from "react"
+import {
+    BoxGeometry,
+    BufferGeometry,
+    Group,
+    InstancedMesh,
+    LineBasicMaterial,
+    LineSegments,
+    Matrix4,
+    MeshPhongMaterial,
+    Quaternion,
+    Vector3,
+} from "three"
+import { getEntityPositionAt, isMotionEntity } from "pro-3d-video/motion"
+import { useStore } from "../../state/store.js"
 
 const geometry = new BoxGeometry()
-const material = new MeshPhongMaterial()
+const meshMaterial = new MeshPhongMaterial()
 
 const helperMatrix = new Matrix4()
 const translateHelper = new Vector3()
 const scaleHelper = new Vector3()
 const rotationHelper = new Quaternion()
 
+const MaxAgentCount = 100
+
 export function Viewer() {
     const ref = useRef<InstancedMesh>(null)
-    useFrame(() => {
+    useFrame((_, delta) => {
         if (ref.current == null) {
             return
         }
-        const currentTime = performance.now() / 1000
-        let animationTime = currentTime - startTime
-        if (animationTime > duration) {
-            animationTime %= duration
-            startTime = currentTime - animationTime
-            for (const entity of entities) {
-                entity.index = 1
-            }
+
+        const { result, duration } = useStore.getState()
+
+        const state = useStore.getState()
+        state.duration = duration
+        if (state.playing) {
+            state.time = duration === 0 ? 0 : (state.time + delta) % duration
         }
-        ref.current.count = Math.min(100, entities.length)
-        for (let i = 0; i < ref.current.count; i++) {
-            const entity = entities[i]
-            let index = entity.index ?? 1
-            while (index < entity.keyframes.length && entity.keyframes[index][3] < animationTime) {
-                index++
+
+        ref.current.count = 0
+        for (const value of result) {
+            if (!isMotionEntity(value.raw)) {
+                continue
             }
-            if (index < entity.keyframes.length && entity.keyframes[index - 1][3] <= animationTime) {
-                entity.index = index
-                const [x1, y1, z1, t1] = entities[i].keyframes[index - 1]
-                const [x2, y2, z2, t2] = entities[i].keyframes[index]
-                const percent = (animationTime - t1) / (t2 - t1)
-                const x = (x2 - x1) * percent + x1
-                const y = (y2 - y1) * percent + y1
-                const z = (z2 - z1) * percent + z1
-                helperMatrix.compose(translateHelper.set(x, y, z), rotationHelper.identity(), scaleHelper.setScalar(1))
-            } else {
-                helperMatrix.compose(translateHelper, rotationHelper.identity(), scaleHelper.setScalar(0))
+            const isPresent = getEntityPositionAt(value.raw.keyframes, state.time, translateHelper)
+            if (!isPresent) {
+                continue
             }
-            ref.current.setMatrixAt(i, helperMatrix)
+            helperMatrix.compose(translateHelper, rotationHelper.identity(), scaleHelper.setScalar(0.1))
+            ref.current.setMatrixAt(ref.current.count, helperMatrix)
+            ref.current.count++
+            if (ref.current.count === MaxAgentCount) {
+                break
+            }
         }
         ref.current.instanceMatrix.needsUpdate = true
     })
-    return <instancedMesh args={[geometry, material, 1]} ref={ref} />
+    return (
+        <>
+            <instancedMesh frustumCulled={false} args={[geometry, meshMaterial, MaxAgentCount]} ref={ref} />
+            <Paths />
+        </>
+    )
+}
+
+const lineMaterial = new LineBasicMaterial({ color: "black" })
+
+export function Paths() {
+    const result = useStore((state) => state.result)
+    const ref = useRef<Group>(null)
+    useEffect(() => {
+        if (ref.current == null) {
+            return
+        }
+        const group = ref.current
+        for (const value of result) {
+            if (!isMotionEntity(value.raw)) {
+                continue
+            }
+
+            const points: Array<Vector3> = []
+
+            for(let i = 1; i < value.raw.keyframes.length; i++) {
+                const p1 = value.raw.keyframes[i - 1]
+                const p2 = value.raw.keyframes[i]
+                points.push(new Vector3(p1.x, p1.y, p1.z), new Vector3(p2.x, p2.y, p2.z))
+            }
+
+            group.add(
+                new LineSegments(
+                    new BufferGeometry().setFromPoints(points),
+                    lineMaterial
+                )
+            )
+        }
+        return () => {
+            group.clear()
+        }
+    }, [result])
+    return <group ref={ref} />
 }

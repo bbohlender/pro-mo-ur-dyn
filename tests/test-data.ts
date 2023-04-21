@@ -10,41 +10,43 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                 initialVariables: {},
                 nouns: {
                     a: {
-                        type: "parallel",
-                        children: [
-                            {
-                                type: "sequential",
-                                children: [
-                                    {
-                                        type: "&&",
-                                        children: [
-                                            {
-                                                type: ">",
-                                                children: [
-                                                    {
-                                                        type: "+",
-                                                        children: [
-                                                            { type: "-()", children: [{ type: "this" }] },
-                                                            {
-                                                                type: "*",
-                                                                children: [
-                                                                    { type: "raw", value: 1 },
-                                                                    { type: "raw", value: 3 },
-                                                                ],
-                                                            },
-                                                        ],
-                                                    },
-                                                    { type: "raw", value: 2 },
-                                                ],
-                                            },
-                                            { type: "raw", value: false },
-                                        ],
-                                    },
-                                    { type: "raw", value: 2 },
-                                ],
-                            },
-                            { type: "raw", value: 2 },
-                        ],
+                        transformation: {
+                            type: "parallel",
+                            children: [
+                                {
+                                    type: "sequential",
+                                    children: [
+                                        {
+                                            type: "&&",
+                                            children: [
+                                                {
+                                                    type: ">",
+                                                    children: [
+                                                        {
+                                                            type: "+",
+                                                            children: [
+                                                                { type: "-()", children: [{ type: "this" }] },
+                                                                {
+                                                                    type: "*",
+                                                                    children: [
+                                                                        { type: "raw", value: 1 },
+                                                                        { type: "raw", value: 3 },
+                                                                    ],
+                                                                },
+                                                            ],
+                                                        },
+                                                        { type: "raw", value: 2 },
+                                                    ],
+                                                },
+                                                { type: "raw", value: false },
+                                            ],
+                                        },
+                                        { type: "raw", value: 2 },
+                                    ],
+                                },
+                                { type: "raw", value: 2 },
+                            ],
+                        },
                     },
                 },
                 rootNounIdentifier: "a",
@@ -58,45 +60,47 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                 initialVariables: {},
                 nouns: {
                     a: {
-                        type: "setVariable",
-                        identifier: "x",
-                        children: [
-                            {
-                                type: "sequential",
-                                children: [
-                                    { type: "raw", value: 11 },
-                                    { type: "%", children: [{ type: "this" }, { type: "raw", value: 2 }] },
-                                    {
-                                        type: "switch",
-                                        cases: [[0, 1], [3]],
-                                        children: [
-                                            { type: "raw", value: 2 },
-                                            {
-                                                type: "if",
-                                                children: [
-                                                    {
-                                                        type: "==",
-                                                        children: [{ type: "this" }, { type: "raw", value: 0 }],
-                                                    },
-                                                    { type: "this" },
-                                                    {
-                                                        type: "*",
-                                                        children: [{ type: "this" }, { type: "raw", value: 2 }],
-                                                    },
-                                                ],
-                                            },
-                                            {
-                                                type: "sequential",
-                                                children: [
-                                                    { type: "getVariable", identifier: "x" },
-                                                    { type: "null" },
-                                                ],
-                                            },
-                                        ],
-                                    },
-                                ],
-                            },
-                        ],
+                        transformation: {
+                            type: "setVariable",
+                            identifier: "x",
+                            children: [
+                                {
+                                    type: "sequential",
+                                    children: [
+                                        { type: "raw", value: 11 },
+                                        { type: "%", children: [{ type: "this" }, { type: "raw", value: 2 }] },
+                                        {
+                                            type: "switch",
+                                            cases: [[0, 1], [3]],
+                                            children: [
+                                                { type: "raw", value: 2 },
+                                                {
+                                                    type: "if",
+                                                    children: [
+                                                        {
+                                                            type: "==",
+                                                            children: [{ type: "this" }, { type: "raw", value: 0 }],
+                                                        },
+                                                        { type: "this" },
+                                                        {
+                                                            type: "*",
+                                                            children: [{ type: "this" }, { type: "raw", value: 2 }],
+                                                        },
+                                                    ],
+                                                },
+                                                {
+                                                    type: "sequential",
+                                                    children: [
+                                                        { type: "getVariable", identifier: "x" },
+                                                        { type: "null" },
+                                                    ],
+                                                },
+                                            ],
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
                     },
                 },
                 rootNounIdentifier: "a",
@@ -112,18 +116,20 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                 },
                 nouns: {
                     a: {
-                        type: "stochasticSwitch",
-                        probabilities: [0.4, 0.6],
-                        children: [
-                            { type: "raw", value: 1 },
-                            {
-                                type: "*",
-                                children: [
-                                    { type: "raw", value: 2 },
-                                    { type: "raw", value: 3 },
-                                ],
-                            },
-                        ],
+                        transformation: {
+                            type: "stochasticSwitch",
+                            probabilities: [0.4, 0.6],
+                            children: [
+                                { type: "raw", value: 1 },
+                                {
+                                    type: "*",
+                                    children: [
+                                        { type: "raw", value: 2 },
+                                        { type: "raw", value: 3 },
+                                    ],
+                                },
+                            ],
+                        },
                     },
                 },
                 rootNounIdentifier: "a",

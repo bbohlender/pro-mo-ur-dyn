@@ -1,11 +1,5 @@
 import { generateUUID } from "three/src/math/MathUtils.js"
-import {
-    ParsedDescriptions,
-    NestedDescriptions,
-    NestedTransformation,
-    NestedDescription,
-    NestedNounReference,
-} from "./index.js"
+import { ParsedDescriptions, NestedDescriptions, NestedTransformation, NestedDescription, NestedNoun } from "./index.js"
 
 export function flattenAST(nestedDescriptions: NestedDescriptions): ParsedDescriptions {
     const transformations: ParsedDescriptions["transformations"] = {}
@@ -13,16 +7,24 @@ export function flattenAST(nestedDescriptions: NestedDescriptions): ParsedDescri
     const nounIdentifierIdMap = new Map<string, string>()
     const descriptions = Object.entries(nestedDescriptions).reduce<ParsedDescriptions["descriptions"]>(
         (prev, [identifier, { initialVariables, nouns: nestedNouns, rootNounIdentifier }]) => {
-            for (const [nounIdentifier, transformation] of Object.entries(nestedNouns)) {
-                nouns[getNounId(nounIdentifier, nounIdentifierIdMap)] = {
+            const descriptionId = generateUUID()
+            for (const [nounIdentifier, noun] of Object.entries(nestedNouns)) {
+                nouns[getNounId(nounIdentifier, identifier, nounIdentifierIdMap, nestedNouns)] = {
                     identifier: nounIdentifier,
-                    tansformationId: flattenTransformation(transformation, transformations, nounIdentifierIdMap),
+                    tansformationId: flattenTransformation(
+                        noun.transformation,
+                        transformations,
+                        nounIdentifierIdMap,
+                        nestedDescriptions,
+                        descriptionId
+                    ),
+                    descriptionId,
                 }
             }
-            prev[identifier] = {
+            prev[descriptionId] = {
                 initialVariables,
                 identifier,
-                rootNounId: getNounId(rootNounIdentifier, nounIdentifierIdMap),
+                rootNounId: getNounId(rootNounIdentifier, identifier, nounIdentifierIdMap, nestedNouns),
             }
             return prev
         },
@@ -35,33 +37,57 @@ export function flattenAST(nestedDescriptions: NestedDescriptions): ParsedDescri
     }
 }
 
-function getNounId(identifier: string, nounIdentifierIdMap: Map<string, string>): string {
-    const id = nounIdentifierIdMap.get(identifier)
+function getNounId(
+    identifier: string,
+    descriptionIdentifier: string,
+    nounIdentifierIdMap: Map<string, string>,
+    nouns: NestedDescription["nouns"]
+): string {
+    const noun = nouns[identifier]
+    if (noun == null) {
+        throw new Error(`unknown noun "${identifier}" at "${descriptionIdentifier}"`)
+    }
+    const astId = noun.astId
+    if (astId != null) {
+        return astId
+    }
+    const globalIdentifier = `${descriptionIdentifier}/${identifier}`
+    const id = nounIdentifierIdMap.get(globalIdentifier)
     if (id != null) {
         return id
     }
-    const newId = generateUUID()
-    nounIdentifierIdMap.set(identifier, newId)
+    const newId = `n${generateUUID()}`
+    nounIdentifierIdMap.set(globalIdentifier, newId)
     return newId
 }
 
 function flattenTransformation(
     nestedTransformation: NestedTransformation,
     transformations: ParsedDescriptions["transformations"],
-    nounIdentifierIdMap: Map<string, string>
+    nounIdentifierIdMap: Map<string, string>,
+    nestedDescriptions: NestedDescriptions,
+    descriptionId: string
 ): string {
-    const transformationId = generateUUID()
+    const transformationId = nestedTransformation.astId ?? `t${generateUUID()}`
     if (nestedTransformation.type === "nounReference") {
         transformations[transformationId] = {
             type: "nounReference",
-            nounId: getNounId(nestedTransformation.nounIdentifier, nounIdentifierIdMap),
+            nounId: getNounId(
+                nestedTransformation.nounIdentifier,
+                nestedTransformation.descriptionIdentifier,
+                nounIdentifierIdMap,
+                nestedDescriptions[nestedTransformation.descriptionIdentifier].nouns
+            ),
+            descriptionId,
         }
         return transformationId
     }
     if ("children" in nestedTransformation && Array.isArray(nestedTransformation.children)) {
         const { children, ...rest } = nestedTransformation
         transformations[transformationId] = {
-            childrenIds: children.map((child) => flattenTransformation(child, transformations, nounIdentifierIdMap)),
+            childrenIds: children.map((child) =>
+                flattenTransformation(child, transformations, nounIdentifierIdMap, nestedDescriptions, descriptionId)
+            ),
             ...rest,
         } as any
     } else {
@@ -74,18 +100,28 @@ export function nestAST(
     { descriptions, nouns: parsedNouns, transformations }: ParsedDescriptions,
     addId: boolean
 ): NestedDescriptions {
-    return Object.values(descriptions).reduce<NestedDescriptions>(
-        (prev, { initialVariables, identifier, rootNounId }) => {
+    return Object.entries(descriptions).reduce<NestedDescriptions>(
+        (prev, [id, { initialVariables, identifier, rootNounId }]) => {
             const nouns: NestedDescription["nouns"] = {}
-            for (const { tansformationId, identifier: nounIdentifier } of Object.values(parsedNouns)) {
-                nouns[nounIdentifier] = nestTransformation(
-                    tansformationId,
-                    transformations,
-                    parsedNouns,
-                    descriptions,
-                    identifier,
-                    addId
-                )
+            for (const [astId, { descriptionId, tansformationId, identifier: nounIdentifier }] of Object.entries(
+                parsedNouns
+            )) {
+                if (descriptionId != id) {
+                    continue
+                }
+                nouns[nounIdentifier] = {
+                    transformation: nestTransformation(
+                        tansformationId,
+                        transformations,
+                        parsedNouns,
+                        descriptions,
+                        identifier,
+                        addId
+                    ),
+                }
+                if (addId) {
+                    nouns[nounIdentifier].astId = astId
+                }
             }
             const rootNoun = parsedNouns[rootNounId]
             if (rootNoun == null) {
@@ -103,35 +139,31 @@ export function nestAST(
 }
 
 export function nestTransformation(
-    id: string,
+    astId: string,
     transformations: ParsedDescriptions["transformations"],
     nouns: ParsedDescriptions["nouns"],
     descriptions: ParsedDescriptions["descriptions"],
     currentDescriptionIdentifier: string,
     addId: boolean
 ): NestedTransformation {
-    const parsedTransformation = transformations[id]
-    if (parsedTransformation == null) {
-        throw new Error(`unknown transformation "${id}"`)
-    }
     let transformation: NestedTransformation
+    const parsedTransformation = transformations[astId]
+    if (parsedTransformation == null) {
+        throw new Error(`unknown transformation "${astId}"`)
+    }
     if (parsedTransformation.type === "nounReference") {
         const noun = nouns[parsedTransformation.nounId]
         if (noun == null) {
             throw new Error(`unknown noun "${parsedTransformation.nounId}"`)
         }
-        let descriptionIdentifier: string = currentDescriptionIdentifier
-        if (parsedTransformation.descriptionId != null) {
-            const description = descriptions[parsedTransformation.descriptionId]
-            if (description == null) {
-                throw new Error(`unknown description "${parsedTransformation.descriptionId}"`)
-            }
-            descriptionIdentifier = description.identifier
+        const description = descriptions[parsedTransformation.descriptionId]
+        if (description == null) {
+            throw new Error(`unknown description "${parsedTransformation.descriptionId}"`)
         }
         transformation = {
             type: "nounReference",
             nounIdentifier: noun.identifier,
-            descriptionIdentifier,
+            descriptionIdentifier: description.identifier,
         }
     } else if (!("childrenIds" in parsedTransformation)) {
         transformation = parsedTransformation
@@ -145,7 +177,7 @@ export function nestTransformation(
         } as any
     }
     if (addId) {
-        transformation.id = id
+        transformation.astId = astId
     }
     return transformation
 }

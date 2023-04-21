@@ -7,9 +7,17 @@ const operations: Operations = {
     moveTo: {
         defaultParameters: [],
         includeThis: true,
-        execute: (next: OperationNextCallback, entity: MotionEntity, x: number, y: number, z: number, dt: number) => {
-            const t = entity.keyframes.at(-1)![3]
-            entity.keyframes.push([x, y, z, t + dt])
+        execute: (
+            next: OperationNextCallback,
+            astId: string,
+            entity: MotionEntity,
+            x: number,
+            y: number,
+            z: number,
+            dt: number
+        ) => {
+            const { t } = entity.keyframes[entity.keyframes.length - 1]
+            entity.keyframes.push({ x, y, z, t: t + dt, astId })
             return next(entity)
         },
     },
@@ -18,14 +26,15 @@ const operations: Operations = {
         includeThis: true,
         execute: (
             next: OperationNextCallback,
+            astId: string,
             entity: MotionEntity,
             dx: number,
             dy: number,
             dz: number,
             dt: number
         ) => {
-            const [x, y, z, t] = entity.keyframes.at(-1)!
-            entity.keyframes.push([x + dx, y + dy, z + dz, t + dt])
+            const { x, y, z, t } = entity.keyframes[entity.keyframes.length - 1]
+            entity.keyframes.push({ x: x + dx, y: y + dy, z: z + dz, t: t + dt, astId })
             return next(entity)
         },
     },
@@ -34,13 +43,14 @@ const operations: Operations = {
         includeThis: true,
         execute: (
             next: OperationNextCallback,
+            astId: string,
             entity: MotionEntity,
             targetX: number,
             targetY: number,
             targetZ: number,
             dt: number
         ) => {
-            const [x, y, z, t] = entity.keyframes.at(-1)!
+            const { x, y, z, t } = entity.keyframes[entity.keyframes.length - 1]
             const timeStep = Math.min(dt, TIME_STEP)
             const dx = targetX - x
             const dy = targetY - y
@@ -60,7 +70,7 @@ const operations: Operations = {
                 nextY = newY
                 nextZ = newZ
             }
-            entity.keyframes.push([nextX, nextY, nextZ, t + timeStep])
+            entity.keyframes.push({ x: nextX, y: nextY, z: nextZ, t: t + timeStep, astId })
 
             if (dt <= TIME_STEP) {
                 return next(entity) //done
@@ -69,8 +79,8 @@ const operations: Operations = {
                 type: "precomputedOperation",
                 identifier: "moveToAndDodge",
                 parameters: [targetX, targetY, targetZ, dt - timeStep],
+                astId,
             }) //schedule again
-            //TODO: somehow get the id from the transformation to here
         },
     },
 }
@@ -80,27 +90,28 @@ export const interpreterOptions: InterpreterOptions = {
         if (isMotionEntity(value)) {
             return { keyframes: [...value.keyframes], type: value.type }
         }
+        return value
     },
     comparePriority(e1, e2) {
         if (!isMotionEntity(e1) || !isMotionEntity(e2)) {
             return 0
         }
-        const e1Time = e1.keyframes.at(-1)![3]
-        const e2Time = e2.keyframes.at(-1)![3]
+        const e1Time = e1.keyframes[e1.keyframes.length - 1].t
+        const e2Time = e2.keyframes[e2.keyframes.length - 1].t
         return e2Time - e1Time
     },
     computeDurationMS: 1000,
-    createValue({ type, x, y, z, time }) {
+    createValue({ type, x, y, z, time }, astId): MotionEntity {
         return {
             type: motionEntityTypeMap[type as keyof typeof motionEntityTypeMap] ?? MotionEntityType.Pedestrian,
-            keyframes: [[x ?? 0, y ?? 0, z ?? 0, time ?? 0]],
+            keyframes: [{ x: x ?? 0, y: y ?? 0, z: z ?? 0, t: time ?? 0, astId }],
         }
     },
     getComputeProgress(entity) {
         if (!isMotionEntity(entity)) {
             return 0
         }
-        return entity.keyframes.at(-1)![3]
+        return entity.keyframes[entity.keyframes.length - 1].t
     },
     operations,
     shouldInterrrupt(startProgress, currentProgress) {
@@ -125,9 +136,19 @@ const motionEntityTypeMap = {
 
 export type MotionEntity = {
     type: MotionEntityType
-    keyframes: Array<readonly [number, number, number, number]> //3D + Time
+    keyframes: Array<Keyframe>
 }
 
-function isMotionEntity(value: unknown): value is MotionEntity {
+export type Keyframe = {
+    x: number
+    y: number
+    z: number
+    t: number
+    astId: string
+}
+
+export function isMotionEntity(value: unknown): value is MotionEntity {
     return typeof value === "object" && value != null && "keyframes" in value
 }
+
+export * from "./helper.js"
