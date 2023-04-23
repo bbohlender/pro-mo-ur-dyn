@@ -21,7 +21,7 @@ export class Queue {
      *
      * @param compare should compare the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
      */
-    constructor(private compare: (v1: unknown, v2: unknown, v1Tr: unknown, v2Tr: unknown) => number) {}
+    constructor(private compare: (v1: unknown, v2: unknown) => number) {}
 
     /**
      * remove the stack entry with the highest priority
@@ -45,19 +45,11 @@ export class Queue {
             this.results.push(entry.value)
             return
         }
-        const newEntryTrans = entry.stack.length > 0 ? entry.stack[0] : undefined
         let i = 0
-        while (
-            i < this.list.length &&
-            this.compare(
-                entry.value.raw,
-                this.list[i].value.raw,
-                newEntryTrans,
-                this.list[i].stack.length > 0 ? this.list[i].stack[0] : undefined
-            ) >= 0
-        ) {
+        while (i < this.list.length && this.compare(entry.value.raw, this.list[i].value.raw) < 0) {
             i++
         }
         this.list.splice(i, 0, entry)
+        console.log(JSON.stringify(this.list))
     }
 }

@@ -15,7 +15,7 @@
     "exports": {
         ".": "./dist/index.js",
         "./motion": "./dist/domains/motion/index.js",
-        "./motion/worker": "./dist/domains/motion/worker.js"
+        "./building": "./dist/domains/building/index.js"
     },
     "author": "",
     "license": "ISC",

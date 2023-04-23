@@ -24,7 +24,7 @@ export function TextEditor() {
     }, [text])
 
     return (
-        <Panel className="flex relative p-3">
+        <Panel className="flex relative p-3 h-full">
             <textarea
                 autoFocus
                 style={{ width: 260, resize: "none", outline: 0, tabSize: 2 }}

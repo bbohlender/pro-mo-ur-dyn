@@ -13,7 +13,7 @@ export type AppState = {
     time: number
     duration: number
     playing: boolean
-    result: Array<Value>
+    result: Array<any>
     interpretationFinished: boolean
 }
 
@@ -38,12 +38,12 @@ export const useStore = createZustand(
             set({ playing: !get().playing })
         },
 
-        replaceResult(result: Array<Value>, final: boolean) {
+        replaceResult(result: Array<any>, final: boolean) {
             let duration = 0
 
             for (const value of result) {
-                if (isMotionEntity(value.raw)) {
-                    duration = Math.max(duration, value.raw.keyframes[value.raw.keyframes.length - 1].t)
+                if (isMotionEntity(value)) {
+                    duration = Math.max(duration, value.keyframes[value.keyframes.length - 1].t)
                 }
             }
 
@@ -51,6 +51,18 @@ export const useStore = createZustand(
         },
 
         //TODO: appendResult(results: Array<Value>) {},
+
+        addDescriptions(nestedDescriptions: NestedDescriptions) {
+            const { descriptions: oldDescriptions } = get()
+            const newDescriptions = flattenAST(nestedDescriptions)
+            set({
+                descriptions: {
+                    descriptions: { ...oldDescriptions.descriptions, ...newDescriptions.descriptions },
+                    nouns: { ...oldDescriptions.nouns, ...newDescriptions.nouns },
+                    transformations: { ...oldDescriptions.transformations, ...newDescriptions.transformations },
+                },
+            })
+        },
 
         setTime(time: number) {
             set({ time: clamp(time, 0, get().duration), playing: false })

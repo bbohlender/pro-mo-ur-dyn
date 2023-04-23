@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { WorkerInterface, nestAST } from "pro-3d-video"
 //@ts-ignore
-import Url from "pro-3d-video/motion/worker?url"
+import Url from "./worker.js?url"
 import { useStore } from "./store.js"
 
 export function useInterpreterResult() {

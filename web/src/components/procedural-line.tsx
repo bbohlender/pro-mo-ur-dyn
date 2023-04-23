@@ -8,7 +8,7 @@ export function ProceduralLine() {
     const result = useStore((state) => state.result)
     const duration = useStore((state) => state.duration)
     return (
-        <Panel className="flex gap-5 flex-col p-5">
+        <Panel className="flex gap-5 flex-col p-5 max-h-10 overflow-y-auto">
             {result
                 .filter((value) => isMotionEntity(value.raw))
                 .map((value, i) => (
