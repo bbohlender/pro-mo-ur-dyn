@@ -2,15 +2,46 @@ import { useStore } from "../state/store.js"
 import { NestedDescriptions } from "pro-3d-video"
 import { Panel } from "./panel.js"
 import simplify from "simplify-js"
+import { exportGLTF as exportBuildingGLTF } from "pro-3d-video/building"
+import { exportGLTF as exportMotionGLTF } from "pro-3d-video/motion"
+import { AnimationClip, KeyframeTrack, Object3D } from "three"
+import { GLTFExporter, GLTFExporterOptions } from "three/examples/jsm/exporters/GLTFExporter.js"
 
 export function Toolbar() {
     return (
-        <Panel className="rounded p-3 flex flex-row">
+        <Panel className="rounded gap-3 p-3 flex flex-row">
             <div onClick={importScene} className="btn btn-outline btn-sm">
                 Import
             </div>
+            <div onClick={exportScene} className="btn btn-outline btn-sm">
+                Export
+            </div>
         </Panel>
     )
+}
+
+const gltfExporter = new GLTFExporter()
+
+async function exportScene() {
+    const { result, duration } = useStore.getState()
+
+    const objects: Array<Object3D> = []
+    const tracks: Array<KeyframeTrack> = []
+
+    exportBuildingGLTF(result, objects, tracks)
+    exportMotionGLTF(result, objects, tracks)
+    const root = new Object3D()
+    root.add(...objects)
+    const binary = (await gltfExporter.parseAsync(root, {
+        binary: true,
+        forceIndices: true,
+        animations: [new AnimationClip("animation", duration, tracks)],
+    })) as ArrayBuffer
+
+    const a = document.createElement("a")
+    a.href = window.URL.createObjectURL(new Blob([binary], { type: "model/gltf-binary" }))
+    a.download = `scene.glb`
+    a.click()
 }
 
 async function importScene() {
@@ -48,7 +79,10 @@ async function importScene() {
     const descriptions: NestedDescriptions = {}
 
     for (const [name, keyframes] of map.entries()) {
-        const simplifiedKeyframes = simplify(keyframes.map((data) => ({ ...getCenter(data), t: data.t })), 0.1) as Array<{
+        const simplifiedKeyframes = simplify(
+            keyframes.map((data) => ({ ...getCenter(data), t: data.t })),
+            0.1
+        ) as Array<{
             x: number
             y: number
             t: number

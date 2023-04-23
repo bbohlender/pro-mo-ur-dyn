@@ -50,6 +50,5 @@ export class Queue {
             i++
         }
         this.list.splice(i, 0, entry)
-        console.log(JSON.stringify(this.list))
     }
 }

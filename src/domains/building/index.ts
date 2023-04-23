@@ -1,4 +1,18 @@
-import { Box3, Color, Shape, ShapeUtils, Vector2, Vector3 } from "three"
+import {
+    Box3,
+    BufferGeometryLoader,
+    Color,
+    Line,
+    Matrix4,
+    Mesh,
+    MeshPhongMaterial,
+    Object3D,
+    Points,
+    Shape,
+    ShapeUtils,
+    Vector2,
+    Vector3,
+} from "three"
 import * as THREE from "three"
 import { FacePrimitive, ObjectPrimitive, PointPrimitive, Primitive } from "./primitive.js"
 //import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
@@ -241,5 +255,54 @@ export const operations: Operations = {
     },
 }
 
+export type SerializedPrimitive = {
+    type: "point" | "mesh" | "line"
+    matrix: Array<number>
+    geometry: object
+}
+
+const loader = new BufferGeometryLoader()
+
+export function isSerializedPrimitive(value: any): value is SerializedPrimitive {
+    return "type" in value && "matrix" in value && "geometry" in value
+}
+
+const matrixHelper = new Matrix4()
+
+export function serializedPrimitiveToObject(value: SerializedPrimitive): Object3D {
+    const geometry = loader.parse(value.geometry)
+
+    let object: Object3D
+
+    switch (value.type) {
+        case "mesh":
+            object = new Mesh(geometry, new MeshPhongMaterial())
+            break
+        case "line":
+            object = new Line(geometry)
+            break
+        case "point":
+            object = new Points(geometry)
+            break
+        default:
+            throw new Error(`unknown value type "${value.type} for serialized primitive"`)
+    }
+
+    matrixHelper.fromArray(value.matrix).decompose(object.position, object.quaternion, object.scale)
+    return object
+}
+
+export function serializePrimitive(primitive: Primitive): SerializedPrimitive {
+    const geometry = primitive.getGeometry()
+    if (primitive instanceof PointPrimitive) {
+        return { type: "point", matrix: primitive.matrix.toArray(), geometry: geometry.toJSON() }
+    } /*else if (value.raw instanceof LinePri) {
+                    return { type: "line", geometry: (geometry as Line<BufferGeometry>).geometry.toJSON() }
+                } */ else {
+        return { type: "mesh", matrix: primitive.matrix.toArray(), geometry: geometry.toJSON() }
+    }
+}
+
 export * from "./math.js"
 export * from "./primitive.js"
+export * from "./exporter.js"

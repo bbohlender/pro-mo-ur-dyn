@@ -4,6 +4,7 @@ import {
     makeTranslationMatrix,
     PointPrimitive,
     Primitive,
+    serializePrimitive,
 } from "pro-3d-video/building"
 import {
     operations as motionOperations,
@@ -23,7 +24,6 @@ initializeWorker({
         return structuredClone(value)
     },
     comparePriority(v1, v2) {
-        console.log("x")
         if (isMotionEntity(v1)) {
             if (isMotionEntity(v2)) {
                 return compareMotionEntityPriority(v1, v2)
@@ -65,17 +65,10 @@ initializeWorker({
         return values.map((value) => {
             if (isMotionEntity(value.raw)) {
                 //const index = value.raw.keyframes.findIndex((keyframe) => keyframe.t > prevProgress)
-                return { keyframes: value.raw.keyframes/*.slice(index)*/, type: value.raw.type } satisfies MotionEntity
+                return { keyframes: value.raw.keyframes /*.slice(index)*/, type: value.raw.type } satisfies MotionEntity
             }
             if (value.raw instanceof Primitive) {
-                const geometry = value.raw.getGeometry()
-                if (value.raw instanceof PointPrimitive) {
-                    return { type: "point", matrix: value.raw.matrix.toArray(), geometry: geometry.attributes }
-                } /*else if (value.raw instanceof LinePri) {
-                    return { type: "line", geometry: (geometry as Line<BufferGeometry>).geometry.toJSON() }
-                } */ else {
-                    return { type: "mesh", matrix: value.raw.matrix.toArray(), geometry: geometry.toJSON() }
-                }
+                return serializePrimitive(value.raw)
             }
             return value
         })

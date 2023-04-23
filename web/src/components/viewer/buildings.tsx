@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react"
 import { useStore } from "../../state/store.js"
-import { BufferGeometryLoader, Group, Line, Mesh, MeshPhongMaterial, Points } from "three"
-
-const loader = new BufferGeometryLoader()
+import { Group } from "three"
+import { isSerializedPrimitive, serializedPrimitiveToObject } from "pro-3d-video/building"
 
 export function Buildings() {
     const result = useStore((state) => state.result)
@@ -13,26 +12,10 @@ export function Buildings() {
             return
         }
         for (const value of result) {
-            if ("type" in value && value.type === "mesh") {
-                const mesh = new Mesh(loader.parse(value.geometry), new MeshPhongMaterial())
-                mesh.matrixAutoUpdate = false
-                mesh.matrix.fromArray(value.matrix)
-                group.add(mesh)
+            if (!isSerializedPrimitive(value)) {
+                continue
             }
-
-            if ("type" in value && value.type === "point") {
-                const points = new Points(loader.parse(value.geometry))
-                points.matrixAutoUpdate = false
-                points.matrix.fromArray(value.matrix)
-                group.add(points)
-            }
-
-            if ("type" in value && value.type === "line") {
-                const line = new Line(loader.parse(value.geometry))
-                line.matrixAutoUpdate = false
-                line.matrix.fromArray(value.matrix)
-                group.add(line)
-            }
+            group.add(serializedPrimitiveToObject(value))
         }
         return () => {
             group.clear()
