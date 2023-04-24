@@ -83,10 +83,9 @@ export function interprete(
         if (initialVariables.interprete === false) {
             continue
         }
-        const raw = options.createValue(initialVariables, noun.astId!)
         queue.push({
             value: {
-                raw: raw,
+                raw: options.createValue(initialVariables, noun.astId!),
                 variables: { ...initialVariables, index: 0 },
             },
             stack: [noun.transformation],
@@ -185,9 +184,6 @@ export function interpreteQueueRecursive(
             interpreteTransformation(nextEntry.value, transformation, descriptions, options, next)
         }
         nextEntry = queue.peek()
-        for (let i = 0; i < 10000000; i++) {
-            //
-        }
     }
 
     publishResult(
@@ -310,7 +306,7 @@ function interpreteStochasticSwitch<R>(
     options: InterpreterOptions,
     next: NextCallback<R>
 ): R {
-    const rand = Math.random()// murmurhash.v3(value.variables.index ?? "", options.seed) / _32bit_max_int
+    const rand = Math.random() // murmurhash.v3(value.variables.index ?? "", options.seed) / _32bit_max_int
 
     let sum = 0
     let i = -1
