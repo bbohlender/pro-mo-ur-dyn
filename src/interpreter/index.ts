@@ -76,15 +76,17 @@ export function interprete(
     const descriptionsEntries = Object.entries(descriptions)
     for (let i = 0; i < descriptionsEntries.length; i++) {
         const [identifier, { initialVariables, rootNounIdentifier, nouns }] = descriptionsEntries[i]
-        console.log("initial varibales")
-        console.log(initialVariables)
         const noun = nouns[rootNounIdentifier]
         if (noun == null) {
             throw new Error(`unknown noun "${rootNounIdentifier}" at description "${identifier}"`)
         }
+        if (initialVariables.interprete === false) {
+            continue
+        }
+        const raw = options.createValue(initialVariables, noun.astId!)
         queue.push({
             value: {
-                raw: options.createValue(initialVariables, noun.astId!),
+                raw: raw,
                 variables: { ...initialVariables, index: 0 },
             },
             stack: [noun.transformation],
@@ -124,9 +126,7 @@ function nextQueued(
         }
         return
     }
-
     currentEntry.stack.unshift(...newTransformations)
-
     if (newRaw !== undefined) {
         //we need to reinsert the entry since the value changed which can change the change the priority and this the order in the queue
         queue.pop()
@@ -450,9 +450,6 @@ function interpreteOperation<R>(
             )
         )
         .map(({ raw }) => raw)
-
-    console.log("this")
-    console.log(value)
 
     if (operation.includeThis) {
         parameters.unshift(options.cloneValue(value.raw))

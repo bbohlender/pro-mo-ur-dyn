@@ -32,10 +32,10 @@ declare var returnSymbol: any;
 declare var nullSymbol: any;
 declare var number: any;
 declare var comma: any;
+declare var point: any;
 declare var boolean: any;
 declare var string: any;
 declare var int: any;
-declare var point: any;
 declare var equal: any;
 declare var ifSymbol: any;
 declare var thenSymbol: any;
@@ -203,6 +203,7 @@ const grammar: Grammar = {
     {"name": "Parameters", "symbols": ["Parameters$ebnf$1", "Transformation"], "postprocess": ([transformations, transformation]) => [...transformations, transformation]},
     {"name": "Parameter", "symbols": ["Transformation", "ws", (lexer.has("comma") ? {type: "comma"} : comma), "ws"], "postprocess": ([transformation]) =>  transformation},
     {"name": "NounReference", "symbols": [(lexer.has("identifier") ? {type: "identifier"} : identifier)], "postprocess": ([{ value }]) => ({ type: "nounReference", nounIdentifier: value })},
+    {"name": "NounReference", "symbols": [(lexer.has("identifier") ? {type: "identifier"} : identifier), (lexer.has("point") ? {type: "point"} : point), (lexer.has("identifier") ? {type: "identifier"} : identifier)], "postprocess": ([{ value: descriptionIdentifier },,{ value: nounIdentifier }]) => ({ type: "nounReference", descriptionIdentifier, nounIdentifier })},
     {"name": "ws", "symbols": [(lexer.has("ws") ? {type: "ws"} : ws)]},
     {"name": "ws", "symbols": []},
     {"name": "Constant", "symbols": [(lexer.has("boolean") ? {type: "boolean"} : boolean)], "postprocess": ([{ value }]) => value === "true"},

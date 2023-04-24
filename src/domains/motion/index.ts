@@ -17,9 +17,6 @@ export const operations: Operations = {
             z: number,
             dt: number
         ) => {
-            console.log("hier ist looking at you")
-            console.log(astId)
-            console.log(entity)
             const { t } = entity.keyframes[entity.keyframes.length - 1]
             entity.keyframes.push({ x, y, z, t: t + dt, astId })
             return next(entity)
@@ -141,10 +138,11 @@ export function comparePriority(e1: unknown, e2: unknown, e1Trans: unknown, e2Tr
 }
 
 export function createMotionEntitiy({ type, x, y, z, time }: any, astId: string): MotionEntity {
-    return {
+    const retval = {
         type: motionEntityTypeMap[type as keyof typeof motionEntityTypeMap] ?? MotionEntityType.Pedestrian,
         keyframes: [{ x: x ?? 0, y: y ?? 0, z: z ?? 0, t: time ?? 0, astId }],
     }
+    return retval
 }
 
 export function getMotionEntityProgress(entity: MotionEntity) {

@@ -49,6 +49,7 @@ export function Agents() {
             if (!isPresent) {
                 continue
             }
+            translateHelper.y += 0.05
             helperMatrix.compose(translateHelper, rotationHelper.identity(), scaleHelper.setScalar(0.1))
             ref.current.setMatrixAt(ref.current.count, helperMatrix)
             ref.current.count++
@@ -61,7 +62,7 @@ export function Agents() {
     return (
         <>
             <instancedMesh frustumCulled={false} args={[geometry, meshMaterial, MaxAgentCount]} ref={ref} />
-            <Paths />
+           
         </>
     )
 }
@@ -86,7 +87,7 @@ export function Paths() {
             for(let i = 1; i < value.keyframes.length; i++) {
                 const p1 = value.keyframes[i - 1]
                 const p2 = value.keyframes[i]
-                points.push(new Vector3(p1.x, p1.y, p1.z), new Vector3(p2.x, p2.y, p2.z))
+                points.push(new Vector3(p1.x, p1.y + 0.05, p1.z), new Vector3(p2.x, p2.y + 0.05, p2.z))
             }
 
             group.add(

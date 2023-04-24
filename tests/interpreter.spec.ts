@@ -20,19 +20,19 @@ function testInterpreteSynchronously(text: string, operations: Operations = {}):
         {
             comparePriority: () => 0,
             createValue: () => 0,
-            serialize: (v, prev, curr) => v,
             cloneValue: (v) => v,
             operations,
             computeDurationMS: 0,
             getComputeProgress: () => 0,
             shouldInterrrupt: () => false,
             shouldWait: () => false,
+            serialize: (values) => values,
         }
     )
     return raw
 }
 
-/* describe("interprete grammar synchronously", () => {
+describe("interprete grammar synchronously", () => {
     it("should interprete sequential execution", async () => {
         const result = testInterpreteSynchronously(`Test { a --> 10 
             -> this * 10 
@@ -84,9 +84,9 @@ function testInterpreteSynchronously(text: string, operations: Operations = {}):
             -> drive() }`)
         ).to.throw(`unknown operation "drive"`)
     })
-}) */
+})
 
-/* describe("test queue", () => {
+describe("test queue", () => {
     const createValue = (e: number): Value => {
         return {
             raw: e,
@@ -220,10 +220,10 @@ function testInterpreteSynchronously(text: string, operations: Operations = {}):
         queue.push(entry4)
         expect(queue.list).to.deep.equal([entry2, entry1, entry4, entry3])
     })
-}) */
+})
 
 describe("interprete grammar asynchronously", () => {
-    /*     it("web worker parallel", async () => {
+    it("web worker parallel", async () => {
         const result = await testAsyncInterpreteArithmetic(`Test { a 
             --> ((1 | 2 * 2) 
             -> this * 2) }`)
@@ -236,7 +236,7 @@ describe("interprete grammar asynchronously", () => {
             --> ((1 | 2 * 2) 
             -> (this + 5 | this * 2)) }`)
         expect(result).to.deep.equal([6, 2, 9, 8])
-    }) */
+    })
 
     it("bela problem", async () => {
         const result = await testAsyncInterpreteMotionEntity(`Test { a --> moveTo(1,1,1,1) }
@@ -245,11 +245,11 @@ describe("interprete grammar asynchronously", () => {
             type: MotionEntityType.Pedestrian,
             keyframes: [{ x: 0, y: 0, z: 0, t: 0, astId: "bela" }],
         }
-        //const moveTo = executeSeveralPositions(entity, [[1, 1, 1, 1]])
-        //const moveTo2 = executeSeveralPositions(entity, [[-1, -1, -1, 1]])
-        expect(result).to.deep.equal([null])
+        const moveTo = executeSeveralPositions(entity, [[1, 1, 1, 1]])
+        const moveTo2 = executeSeveralPositions(entity, [[-1, -1, -1, 1]])
+        expect(excludeAstID(result)).to.deep.equal(excludeAstID([moveTo, moveTo2]))
     })
-    /*     it("web worker motion entity", async () => {
+    it("web worker motion entity", async () => {
         const result = await testAsyncInterpreteMotionEntity(
             `Test (type: "car" x:0 y:0 z:0  time:0) { a --> moveTo(10,0,0,10) 
                 -> moveTo(10,0,0,10) 
@@ -295,13 +295,13 @@ describe("interprete grammar asynchronously", () => {
             [0, 50, 0, 20],
             [0, 50, 0, 20],
         ])
-        expect(result).to.deep.equal([moveTo2, moveTo])
-    }) */
+        expect(excludeAstID(result)).to.deep.equal(excludeAstID([moveTo2, moveTo]))
+    })
 })
 
 function executeSeveralPositions(entity: MotionEntity, positions: Array<[number, number, number, number]>) {
     for (const pos of positions) {
-        entity = operations.moveTo.execute((e) => e, JSON.parse(JSON.stringify(entity)), ...pos)
+        entity = operations.moveTo.execute((e) => e, "" + Math.random(), JSON.parse(JSON.stringify(entity)), ...pos)
     }
     return entity
 }
@@ -317,16 +317,13 @@ function testAsyncInterpreteMotionEntity(descriptions: string): Promise<Array<an
             (values, isFinal) => {
                 if (isFinal) {
                     workerInterface.terminate()
-                    resolve(values.map((v: { raw: any }) => v.raw))
+                    resolve(values)
                 }
             }
         )
         setTimeout(() => {
             workerInterface.updateRequestedProgress(200)
         }, 6000)
-        console.log("hier werden die initial variables gesetzt")
-        const descrip = nestAST(flattenAST(parse(descriptions)), true)
-        console.log(descrip)
         workerInterface.interprete(nestAST(flattenAST(parse(descriptions)), true), 100)
     })
 }
@@ -340,14 +337,23 @@ function testAsyncInterpreteArithmetic(descriptions: string): Promise<Array<any>
                 type: "module",
             },
             (values, isFinal) => {
-                console.log(values)
                 if (isFinal) {
-                    console.log("is final")
                     workerInterface.terminate()
-                    resolve(values.map((v: { raw: any }) => v.raw))
+                    resolve(values.map((v: Value) => v.raw))
                 }
             }
         )
         workerInterface.interprete(parse(descriptions), 1000)
+    })
+}
+
+function excludeAstID(entities: MotionEntity[]) {
+    return entities.map((entity) => {
+        return {
+            ...entity,
+            keyframes: entity.keyframes.map((val) => {
+                return { x: val.x, t: val.t, z: val.z, y: val.y }
+            }),
+        }
     })
 }

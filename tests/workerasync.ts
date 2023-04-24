@@ -20,12 +20,12 @@ initializeWorker({
 
 function deepClone(object: unknown) {
     if (typeof object === "object" && !Array.isArray(object) && object !== null) {
-        let object = {}
+        let objects = {}
         for (const [key, values] of Object.entries(object)) {
             if (typeof values === "object" && !Array.isArray(values) && values !== null) {
-                object = { ...object, [key]: { ...values } }
+                objects = { ...objects, [key]: { ...values } }
             } else {
-                object = { ...object, [key]: values }
+                objects = { ...objects, [key]: values }
             }
         }
         return object

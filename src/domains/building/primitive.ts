@@ -27,7 +27,7 @@ import {
 import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { makeScaleMatrix, computeDirectionMatrix, makeRotationMatrix, makeTranslationMatrix } from "./math.js"
 import { sampleGeometry, distributeOverSizes } from "../sample.js"
-import { filterNull } from "../util.js"
+import { filterNull } from "../../util.js"
 
 const helperMatrix = new Matrix4()
 const helperVector = new Vector3()

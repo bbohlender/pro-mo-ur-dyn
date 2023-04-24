@@ -6,12 +6,21 @@ import { exportGLTF as exportBuildingGLTF } from "pro-3d-video/building"
 import { exportGLTF as exportMotionGLTF } from "pro-3d-video/motion"
 import { AnimationClip, KeyframeTrack, Object3D } from "three"
 import { GLTFExporter, GLTFExporterOptions } from "three/examples/jsm/exporters/GLTFExporter.js"
+import {
+    convertLotsToDescriptions,
+    convertStreetsToDescription,
+    loadMapLayers,
+    tileMeterRatio,
+} from "../state/mapbox.js"
 
 export function Toolbar() {
     return (
         <Panel className="rounded gap-3 p-3 flex flex-row">
-            <div onClick={importScene} className="btn btn-outline btn-sm">
-                Import
+            <div onClick={importAgents} className="btn btn-outline btn-sm">
+                Import Agents
+            </div>
+            <div onClick={importBuildingsPathways} className="btn btn-outline btn-sm">
+                Import Buildings & Pathways
             </div>
             <div onClick={exportScene} className="btn btn-outline btn-sm">
                 Export
@@ -44,7 +53,15 @@ async function exportScene() {
     a.click()
 }
 
-async function importScene() {
+async function importBuildingsPathways() {
+    const layers = await loadMapLayers("_18-77198-98516.mvt", 98516, 18)
+    useStore.getState().addDescriptions({
+        ...convertLotsToDescriptions(layers),
+        //Streets: convertStreetsToDescription(layers),
+    })
+}
+
+async function importAgents() {
     const text = await (await fetch("bookstore0.txt")).text()
     const dataset = text.split("\n").map((line) => line.split(" "))
     const map = new Map<

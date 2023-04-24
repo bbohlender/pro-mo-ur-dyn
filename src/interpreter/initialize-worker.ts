@@ -9,15 +9,10 @@ function publishResult(
     prevProgress: any,
     currentProgress: any | undefined
 ) {
-    console.log("resultat:")
-    console.log(values)
-    console.log(prevProgress)
-    console.log(currentProgress)
-    console.log("ende")
     postMessage({
         type: WorkerMessageType.Results,
         result: options.serialize(values, prevProgress, currentProgress),
-        isFinal: currentProgress == null,
+        isFinal: currentProgress === undefined,
     })
 }
 
@@ -43,9 +38,9 @@ export function initializeWorker(options: InterpreterOptions): void {
                     throw new Error(`unable to update requested progress when interpretation has not yet been started`)
                 }
                 references.requestedProgress = e.data.requestedProgress
-                if (references.timeoutRef != null) {
-                    interpreteQueueRecursive(queue, descriptions, options, references, publish)
-                }
+                //if (references.timeoutRef != null) {
+                interpreteQueueRecursive(queue, descriptions, options, references, publish)
+                //}
                 return
         }
     }
