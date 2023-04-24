@@ -1,7 +1,6 @@
 // @ts-ignore
 import Worker from "web-worker"
 import { NestedDescriptions } from "../index.js"
-import { Value } from "./index.js"
 
 export type WorkerMessage =
     | {

@@ -276,7 +276,7 @@ export function serializedPrimitiveToObject(value: SerializedPrimitive): Object3
 
     switch (value.type) {
         case "mesh":
-            object = new Mesh(geometry, new MeshPhongMaterial())
+            object = new Mesh(geometry, new MeshPhongMaterial({ color: "white", toneMapped: false }))
             break
         case "line":
             object = new Line(geometry)

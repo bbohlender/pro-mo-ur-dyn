@@ -9,5 +9,6 @@ initializeWorker({
     operations: {},
     shouldInterrrupt: () => false,
     shouldWait: () => false,
+    serialize: (values) => values,
     seed: 0,
 })

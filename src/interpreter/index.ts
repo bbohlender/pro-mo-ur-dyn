@@ -80,6 +80,9 @@ export function interprete(
         if (noun == null) {
             throw new Error(`unknown noun "${rootNounIdentifier}" at description "${identifier}"`)
         }
+        if (initialVariables.interprete === false) {
+            continue
+        }
         queue.push({
             value: {
                 raw: options.createValue(initialVariables, noun.astId!),

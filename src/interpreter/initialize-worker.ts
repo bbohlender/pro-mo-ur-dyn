@@ -11,7 +11,8 @@ function publishResult(
 ) {
     postMessage({
         type: WorkerMessageType.Results,
-        result: options.serialize(values, prevProgress, currentProgress)
+        result: options.serialize(values, prevProgress, currentProgress),
+        isFinal: currentProgress === undefined
     })
 }
 

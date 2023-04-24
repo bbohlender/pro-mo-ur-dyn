@@ -5,9 +5,10 @@ export function flattenAST(nestedDescriptions: NestedDescriptions): ParsedDescri
     const transformations: ParsedDescriptions["transformations"] = {}
     const nouns: ParsedDescriptions["nouns"] = {}
     const nounIdentifierIdMap = new Map<string, string>()
+    const descriptionIdentifierIdMap = new Map<string, string>()
     const descriptions = Object.entries(nestedDescriptions).reduce<ParsedDescriptions["descriptions"]>(
         (prev, [identifier, { initialVariables, nouns: nestedNouns, rootNounIdentifier }]) => {
-            const descriptionId = generateUUID()
+            const descriptionId = getDescriptionId(identifier, descriptionIdentifierIdMap, nestedDescriptions)
             for (const [nounIdentifier, noun] of Object.entries(nestedNouns)) {
                 nouns[getNounId(nounIdentifier, identifier, nounIdentifierIdMap, nestedNouns)] = {
                     identifier: nounIdentifier,
@@ -15,8 +16,8 @@ export function flattenAST(nestedDescriptions: NestedDescriptions): ParsedDescri
                         noun.transformation,
                         transformations,
                         nounIdentifierIdMap,
-                        nestedDescriptions,
-                        descriptionId
+                        descriptionIdentifierIdMap,
+                        nestedDescriptions
                     ),
                     descriptionId,
                 }
@@ -61,12 +62,34 @@ function getNounId(
     return newId
 }
 
+function getDescriptionId(
+    identifier: string,
+    descriptionIdentifierIdMap: Map<string, string>,
+    descriptions: NestedDescriptions
+): string {
+    const description = descriptions[identifier]
+    if (description == null) {
+        throw new Error(`unknown description "${identifier}"`)
+    }
+    const astId = description.astId
+    if (astId != null) {
+        return astId
+    }
+    const id = descriptionIdentifierIdMap.get(identifier)
+    if (id != null) {
+        return id
+    }
+    const newId = `d${generateUUID()}`
+    descriptionIdentifierIdMap.set(identifier, newId)
+    return newId
+}
+
 function flattenTransformation(
     nestedTransformation: NestedTransformation,
     transformations: ParsedDescriptions["transformations"],
     nounIdentifierIdMap: Map<string, string>,
-    nestedDescriptions: NestedDescriptions,
-    descriptionId: string
+    descriptionIdentifierIdMap: Map<string, string>,
+    nestedDescriptions: NestedDescriptions
 ): string {
     const transformationId = nestedTransformation.astId ?? `t${generateUUID()}`
     if (nestedTransformation.type === "nounReference") {
@@ -78,7 +101,11 @@ function flattenTransformation(
                 nounIdentifierIdMap,
                 nestedDescriptions[nestedTransformation.descriptionIdentifier].nouns
             ),
-            descriptionId,
+            descriptionId: getDescriptionId(
+                nestedTransformation.descriptionIdentifier,
+                descriptionIdentifierIdMap,
+                nestedDescriptions
+            ),
         }
         return transformationId
     }
@@ -86,7 +113,7 @@ function flattenTransformation(
         const { children, ...rest } = nestedTransformation
         transformations[transformationId] = {
             childrenIds: children.map((child) =>
-                flattenTransformation(child, transformations, nounIdentifierIdMap, nestedDescriptions, descriptionId)
+                flattenTransformation(child, transformations, nounIdentifierIdMap, descriptionIdentifierIdMap, nestedDescriptions)
             ),
             ...rest,
         } as any

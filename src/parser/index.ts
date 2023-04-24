@@ -28,7 +28,7 @@ function setDescriptionIdentifier(transformation: NestedTransformation, identifi
         }
         return
     }
-    if (transformation.type === "nounReference") {
+    if (transformation.type === "nounReference" && transformation.descriptionIdentifier == null) {
         transformation.descriptionIdentifier = identifier
     }
 }
@@ -139,6 +139,7 @@ export type NestedDescription = {
     rootNounIdentifier: string
     nouns: { [Identifier in string]: NestedNoun }
     initialVariables: { [Name in string]: any }
+    astId?: string
 }
 
 export type NestedTransformation =

@@ -136,6 +136,7 @@ Parameters              ->  Parameter:* Transformation                          
 Parameter               ->  Transformation ws %comma ws                                     {% ([transformation]) =>  transformation %}
 
 NounReference           ->  %identifier                                                     {% ([{ value }]) => ({ type: "nounReference", nounIdentifier: value }) %}
+                        |   %identifier %point %identifier                                  {% ([{ value: descriptionIdentifier },,{ value: nounIdentifier }]) => ({ type: "nounReference", descriptionIdentifier, nounIdentifier }) %}
 
 ws                      ->  %ws | null
 

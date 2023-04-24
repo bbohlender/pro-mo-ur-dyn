@@ -1,5 +1,5 @@
 import { expect } from "chai"
-import { parse } from "../src/index.js"
+import { Value, parse } from "../src/index.js"
 import { Operations, interpreteTransformationSynchronous, WorkerInterface } from "../src/index.js"
 
 //TODO: write tests for:
@@ -12,7 +12,7 @@ function testInterpreteSynchronously(text: string, operations: Operations = {}, 
     const [description] = Object.values(descriptions)
     const rootNoun = description.nouns[description.rootNounIdentifier]
     const { raw } = interpreteTransformationSynchronous(
-        { raw: 1, index: [], variables: {} },
+        { raw: 1, variables: {} },
         rootNoun.transformation,
         descriptions,
         {
@@ -24,6 +24,7 @@ function testInterpreteSynchronously(text: string, operations: Operations = {}, 
             operations,
             shouldInterrrupt: () => false,
             shouldWait: () => false,
+            serialize: (values) => values,
             seed,
         }
     )
@@ -153,7 +154,7 @@ describe("interprete grammar asynchronously", () => {
     it("web worker parallel", async () => {
         const result = await testAsyncInterprete(`Test { a --> ((1 | 2 * 2) -> this * 2) }`)
 
-        expect(result).to.deep.equal([2, 8])
+        expect(result).to.deep.equal([8, 2])
     })
 })
 
@@ -168,7 +169,7 @@ function testAsyncInterprete(descriptions: string): Promise<Array<any>> {
             (values, isFinal) => {
                 if (isFinal) {
                     workerInterface.terminate()
-                    resolve(values.map((v) => v.raw))
+                    resolve(values.map((v: Value) => v.raw))
                 }
             }
         )
