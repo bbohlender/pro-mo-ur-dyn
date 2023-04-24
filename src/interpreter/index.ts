@@ -55,7 +55,7 @@ export type InterpreterOptions = Readonly<{
     /**
      * compares the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
      */
-    comparePriority: (v1: unknown, v2: unknown) => number
+    comparePriority: (v1: unknown, v2: unknown, v1Tr: unknown, v2Tr: unknown) => number
     createValue: (initialVariables: NestedDescription["initialVariables"], astId: string) => any
     serialize: (values: Array<Value>, prevProgress: any, currentProgress: any | undefined) => any
     cloneValue: (value: unknown) => unknown
@@ -125,9 +125,7 @@ function nextQueued(
         }
         return
     }
-
     currentEntry.stack.unshift(...newTransformations)
-
     if (newRaw !== undefined) {
         //we need to reinsert the entry since the value changed which can change the change the priority and this the order in the queue
         queue.pop()
@@ -196,7 +194,7 @@ export function interpreteQueueRecursive(
 
     if (
         nextEntry == null ||
-        options.shouldWait(references.requestedProgress, options.getComputeProgress(nextEntry.value))
+        options.shouldWait(references.requestedProgress, options.getComputeProgress(nextEntry.value.raw))
     ) {
         return
     }
@@ -308,7 +306,7 @@ function interpreteStochasticSwitch<R>(
     options: InterpreterOptions,
     next: NextCallback<R>
 ): R {
-    const rand = Math.random()// murmurhash.v3(value.variables.index ?? "", options.seed) / _32bit_max_int
+    const rand = Math.random() // murmurhash.v3(value.variables.index ?? "", options.seed) / _32bit_max_int
 
     let sum = 0
     let i = -1

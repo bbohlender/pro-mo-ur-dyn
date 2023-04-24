@@ -1,14 +1,15 @@
-import { initializeWorker } from "pro-3d-video"
+import { InterpreterOptions, initializeWorker } from "../../../dist/index.js"
+
 import {
-    operations as buildingOperations,
-    makeTranslationMatrix,
     PointPrimitive,
     Primitive,
+    makeTranslationMatrix,
+    operations as buildingOperations,
     serializePrimitive,
 } from "pro-3d-video/building"
 import {
     operations as motionOperations,
-    compareMotionEntityPriority,
+    comparePriority,
     getMotionEntityProgress,
     isMotionEntity,
     createMotionEntitiy,
@@ -16,7 +17,7 @@ import {
 import { Pathway, operations as pathwayOperations } from "pro-3d-video/pathway"
 import { Matrix4 } from "three"
 
-initializeWorker({
+export const interpreterOptions: InterpreterOptions = {
     cloneValue(value) {
         if (value instanceof Primitive) {
             return value.clone()
@@ -26,7 +27,7 @@ initializeWorker({
     comparePriority(v1, v2) {
         if (isMotionEntity(v1)) {
             if (isMotionEntity(v2)) {
-                return compareMotionEntityPriority(v1, v2)
+                return comparePriority(v1, v2, undefined, undefined)
             }
             return -1
         }
@@ -37,7 +38,7 @@ initializeWorker({
         return 0
     },
     computeDurationMS: 1000,
-    createValue(variables, astId) {
+    createValue(variables, astId: string) {
         if (variables.type === "building") {
             return new PointPrimitive(
                 makeTranslationMatrix(variables.x ?? 0, variables.y ?? 0, variables.z ?? 0, new Matrix4())
@@ -59,7 +60,7 @@ initializeWorker({
     operations: {
         ...buildingOperations,
         ...motionOperations,
-        ...pathwayOperations
+        ...pathwayOperations,
     },
     shouldInterrrupt(startProgress, currentProgress) {
         return currentProgress - startProgress > 3 //3 seconds computed
@@ -79,4 +80,6 @@ initializeWorker({
             return value.raw
         })
     },
-})
+}
+
+initializeWorker(interpreterOptions)

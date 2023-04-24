@@ -1,3 +1,4 @@
+import { NestedPrecomputedOperation } from "../../index.js"
 import { InterpreterOptions, OperationNextCallback, Operations } from "../../interpreter/index.js"
 
 const TIME_STEP = 100 //ms
@@ -115,10 +116,25 @@ export const operations: Operations = {
     },
 }
 
-export function compareMotionEntityPriority(e1: MotionEntity, e2: MotionEntity) {
-    const e1Time = e1.keyframes[e1.keyframes.length - 1].t
-    const e2Time = e2.keyframes[e2.keyframes.length - 1].t
-    return e2Time - e1Time
+export function comparePriority(e1: unknown, e2: unknown, e1Trans: unknown, e2Trans: unknown) {
+    if (!isMotionEntity(e1) || !isMotionEntity(e2)) {
+        return 0
+    }
+    let addedCurrTime = 0
+    let addedListItemTime = 0
+    if (isNestedPrecomputedOperation(e1Trans)) {
+        const oper = e1Trans as NestedPrecomputedOperation
+        addedCurrTime = oper.parameters[3]
+    }
+    if (isNestedPrecomputedOperation(e2Trans)) {
+        const oper = e2Trans as NestedPrecomputedOperation
+        addedListItemTime = oper.parameters[3]
+    }
+    return (
+        e1.keyframes[e1.keyframes.length - 1]!.t +
+        addedCurrTime -
+        (e2.keyframes[e2.keyframes.length - 1]!.t + addedListItemTime)
+    )
 }
 
 export function createMotionEntitiy({ type, x, y, z, time }: any, astId: string): MotionEntity {
@@ -161,5 +177,14 @@ export function isMotionEntity(value: unknown): value is MotionEntity {
     return typeof value === "object" && value != null && "keyframes" in value
 }
 
+function isNestedPrecomputedOperation(value: unknown): value is NestedPrecomputedOperation {
+    return (
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        value !== null &&
+        "type" in value &&
+        value.type == "precomputedOperation"
+    )
+}
 export * from "./helper.js"
 export * from "./exporter.js"

@@ -1,16 +1,17 @@
 {
-    "name": "pro-3d-video",
-    "version": "1.0.0",
-    "description": "Procedural 3D Video: A Procedural Approach For Describing Motion",
-    "main": "dist/index.js",
-    "type": "module",
-    "scripts": {
-        "generate:parser": "nearleyc grammar.ne -o src/parser/parser.ts",
-        "build": "tsc -p build.tsconfig.json",
-        "fix": "run-s fix:prettier fix:eslint",
-        "fix:prettier": "prettier --write 'src/**/*.{ts,tsx}'",
-        "fix:eslint": "eslint src --fix",
-        "test": "nyc mocha ./tests/*.spec.ts --timeout 15000"
+  "name": "pro-3d-video",
+  "version": "1.0.0",
+  "description": "Procedural 3D Video: A Procedural Approach For Describing Motion",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+      "generate:parser": "nearleyc grammar.ne -o src/parser/parser.ts",
+      "build": "tsc -p build.tsconfig.json",
+      "fix": "run-s fix:prettier fix:eslint",
+      "fix:prettier": "prettier --write 'src/**/*.{ts,tsx}'",
+      "fix:eslint": "eslint src --fix",
+      "test": "nyc mocha ./tests/*.spec.ts --timeout 15000",
+      "test:interpreter": "nyc mocha ./tests/interpreter.spec.ts --timeout 15000"
     },
     "exports": {
         ".": "./dist/index.js",
