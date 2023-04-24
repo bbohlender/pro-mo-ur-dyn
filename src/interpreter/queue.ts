@@ -45,19 +45,21 @@ export class Queue {
             this.results.push(entry.value)
             return
         }
+        let index = this.list.length
         const newEntryTrans = entry.stack.length > 0 ? entry.stack[0] : undefined
-        let i = 0
-        while (
-            i < this.list.length &&
-            this.compare(
-                entry.value.raw,
-                this.list[i].value.raw,
-                newEntryTrans,
-                this.list[i].stack.length > 0 ? this.list[i].stack[0] : undefined
-            ) >= 0
-        ) {
-            i++
+        for (let i = 0; i < this.list.length; i++) {
+            if (
+                this.compare(
+                    entry,
+                    this.list[i],
+                    newEntryTrans,
+                    this.list[i].stack.length > 0 ? this.list[i].stack[0] : undefined
+                ) < 0
+            ) {
+                index = i
+                break
+            }
         }
-        this.list.splice(i, 0, entry)
+        this.list.splice(index, 0, entry)
     }
 }

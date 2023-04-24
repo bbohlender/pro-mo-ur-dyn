@@ -119,8 +119,8 @@ export const interpreterOptions: InterpreterOptions = {
     shouldInterrrupt(startProgress, currentProgress) {
         return currentProgress - startProgress > 1000 //interrupt every second
     },
-    shouldWait(p) {
-        return p > 10000 //only computes the first 10 second
+    shouldWait(r, p) {
+        return p > r //only computes the first 10 second
     },
 }
 

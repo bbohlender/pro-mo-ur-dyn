@@ -28,9 +28,10 @@ export function initializeWorker(options: InterpreterOptions): void {
                     throw new Error(`unable to update requested progress when interpretation has not yet been started`)
                 }
                 references.requestedProgress = e.data.requestedProgress
-                if (references.timeoutRef != null) {
-                    interpreteQueueRecursive(queue, descriptions, options, references, publishResult)
-                }
+                //verstehe den code nicht
+                //if (references.timeoutRef != null) {
+                interpreteQueueRecursive(queue, descriptions, options, references, publishResult)
+                //}
                 return
         }
     }

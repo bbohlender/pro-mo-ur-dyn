@@ -166,7 +166,6 @@ export function interpreteQueueRecursive(
         !options.shouldInterrrupt(progressAtStart, options.getComputeProgress(nextEntry.value))
     ) {
         const transformation = nextEntry.stack.shift()!
-        //console.log("neue iteration")
         if (transformation.type === "parallel") {
             queue.pop()
             for (const [index, nextTransformation] of transformation.children.entries()) {
@@ -188,7 +187,7 @@ export function interpreteQueueRecursive(
 
     if (
         nextEntry == null ||
-        options.shouldWait(references.requestedProgress, options.getComputeProgress(nextEntry.value))
+        options.shouldWait(references.requestedProgress, options.getComputeProgress(nextEntry.value.raw))
     ) {
         return
     }
