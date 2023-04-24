@@ -135,8 +135,8 @@ EmptyParameters         ->  ws Parameters                                       
 Parameters              ->  Parameter:* Transformation                                      {% ([transformations, transformation]) => [...transformations, transformation] %}
 Parameter               ->  Transformation ws %comma ws                                     {% ([transformation]) =>  transformation %}
 
-NounReference           ->  %identifier                                                     {% ([{ value }]) => ({ type: "nounReference", nounIdentifier: value }) %}
-                        |   %identifier %point %identifier                                  {% ([{ value: descriptionIdentifier },,{ value: nounIdentifier }]) => ({ type: "nounReference", descriptionIdentifier, nounIdentifier }) %}
+NounReference           ->  %identifier %point %identifier                                  {% ([{ value: descriptionIdentifier },,{ value: nounIdentifier }]) => ({ type: "nounReference", descriptionIdentifier, nounIdentifier }) %}
+                        |   %identifier                                                     {% ([{ value }]) => ({ type: "nounReference", nounIdentifier: value }) %}
 
 ws                      ->  %ws | null
 

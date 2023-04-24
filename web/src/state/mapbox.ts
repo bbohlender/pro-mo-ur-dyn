@@ -56,10 +56,10 @@ export async function loadMapLayers(url: string, y: number, zoom: number, tilePi
     }, {} as Layers)
 }
 
-export function convertStreetsToDescription(layers: Layers): NestedDescription {
+export function convertPathwaysToDescription(layers: Layers): NestedDescription {
     return {
         rootNounIdentifier: "Start",
-        initialVariables: {},
+        initialVariables: { type: "pathway" },
         nouns: {
             Start: {
                 transformation: {
@@ -157,13 +157,26 @@ function convertPolygonStreetToDescription(polygon: Layers[string][number]["geom
     return {
         type: "sequential",
         children: [
-            { type: "operation", identifier: "streetFrom", children: [] },
+            {
+                type: "operation",
+                identifier: "pathwayFrom",
+                children: [
+                    {
+                        type: "raw",
+                        value: polygon[0].x,
+                    },
+                    {
+                        type: "raw",
+                        value: polygon[0].y,
+                    },
+                ],
+            },
             ...polygon
                 .slice(1)
                 .map<NestedTransformation | undefined>(({ x, y }, i) => {
                     return {
                         type: "operation",
-                        identifier: "streetTo",
+                        identifier: "pathwayTo",
                         children: [
                             {
                                 type: "raw",

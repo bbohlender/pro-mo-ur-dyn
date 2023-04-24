@@ -1,8 +1,10 @@
 import { useFrame } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
 import {
+    BackSide,
     BoxGeometry,
     BufferGeometry,
+    DoubleSide,
     Group,
     InstancedMesh,
     LineBasicMaterial,
@@ -16,7 +18,7 @@ import { getEntityPositionAt, isMotionEntity } from "pro-3d-video/motion"
 import { useStore } from "../../state/store.js"
 
 const geometry = new BoxGeometry()
-const meshMaterial = new MeshPhongMaterial()
+const meshMaterial = new MeshPhongMaterial({ toneMapped: false, color: "white" })
 
 const helperMatrix = new Matrix4()
 const translateHelper = new Vector3()
@@ -62,7 +64,7 @@ export function Agents() {
     return (
         <>
             <instancedMesh frustumCulled={false} args={[geometry, meshMaterial, MaxAgentCount]} ref={ref} />
-           
+            <Paths />
         </>
     )
 }
@@ -84,18 +86,13 @@ export function Paths() {
 
             const points: Array<Vector3> = []
 
-            for(let i = 1; i < value.keyframes.length; i++) {
+            for (let i = 1; i < value.keyframes.length; i++) {
                 const p1 = value.keyframes[i - 1]
                 const p2 = value.keyframes[i]
                 points.push(new Vector3(p1.x, p1.y + 0.05, p1.z), new Vector3(p2.x, p2.y + 0.05, p2.z))
             }
 
-            group.add(
-                new LineSegments(
-                    new BufferGeometry().setFromPoints(points),
-                    lineMaterial
-                )
-            )
+            group.add(new LineSegments(new BufferGeometry().setFromPoints(points), lineMaterial))
         }
         return () => {
             group.clear()

@@ -4,11 +4,12 @@ import { Panel } from "./panel.js"
 import simplify from "simplify-js"
 import { exportGLTF as exportBuildingGLTF } from "pro-3d-video/building"
 import { exportGLTF as exportMotionGLTF } from "pro-3d-video/motion"
+import { exportGLTF as exportPathwayGLTF } from "pro-3d-video/pathway"
 import { AnimationClip, KeyframeTrack, Object3D } from "three"
 import { GLTFExporter, GLTFExporterOptions } from "three/examples/jsm/exporters/GLTFExporter.js"
 import {
     convertLotsToDescriptions,
-    convertStreetsToDescription,
+    convertPathwaysToDescription,
     loadMapLayers,
     tileMeterRatio,
 } from "../state/mapbox.js"
@@ -39,6 +40,8 @@ async function exportScene() {
 
     exportBuildingGLTF(result, objects, tracks)
     exportMotionGLTF(result, objects, tracks)
+    exportPathwayGLTF(result, objects, tracks)
+
     const root = new Object3D()
     root.add(...objects)
     const binary = (await gltfExporter.parseAsync(root, {
@@ -57,7 +60,7 @@ async function importBuildingsPathways() {
     const layers = await loadMapLayers("_18-77198-98516.mvt", 98516, 18)
     useStore.getState().addDescriptions({
         ...convertLotsToDescriptions(layers),
-        //Streets: convertStreetsToDescription(layers),
+        Streets: convertPathwaysToDescription(layers),
     })
 }
 

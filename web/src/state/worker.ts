@@ -12,8 +12,8 @@ import {
     getMotionEntityProgress,
     isMotionEntity,
     createMotionEntitiy,
-    MotionEntity,
 } from "pro-3d-video/motion"
+import { Pathway, operations as pathwayOperations } from "pro-3d-video/pathway"
 import { Matrix4 } from "three"
 
 initializeWorker({
@@ -43,6 +43,11 @@ initializeWorker({
                 makeTranslationMatrix(variables.x ?? 0, variables.y ?? 0, variables.z ?? 0, new Matrix4())
             )
         }
+        if (variables.type === "pathway") {
+            return {
+                points: [{ x: variables.x ?? 0, y: variables.y ?? 0, size: variables.size ?? 0, astId }],
+            } satisfies Pathway
+        }
         return createMotionEntitiy(variables, astId)
     },
     getComputeProgress(value) {
@@ -54,6 +59,7 @@ initializeWorker({
     operations: {
         ...buildingOperations,
         ...motionOperations,
+        ...pathwayOperations
     },
     shouldInterrrupt(startProgress, currentProgress) {
         return currentProgress - startProgress > 3 //3 seconds computed
@@ -63,14 +69,14 @@ initializeWorker({
     },
     serialize(values, prevProgress, currentProgress) {
         return values.map((value) => {
-            if (isMotionEntity(value.raw)) {
-                //const index = value.raw.keyframes.findIndex((keyframe) => keyframe.t > prevProgress)
-                return { keyframes: value.raw.keyframes /*.slice(index)*/, type: value.raw.type } satisfies MotionEntity
-            }
+            /*if (isMotionEntity(value.raw)) {
+                const index = value.raw.keyframes.findIndex((keyframe) => keyframe.t > prevProgress)
+                return { keyframes: value.raw.keyframes.slice(index), type: value.raw.type } satisfies MotionEntity
+            }*/
             if (value.raw instanceof Primitive) {
                 return serializePrimitive(value.raw)
             }
-            return value
+            return value.raw
         })
     },
 })
