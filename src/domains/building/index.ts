@@ -1,7 +1,9 @@
 import {
+    BackSide,
     Box3,
     BufferGeometryLoader,
     Color,
+    DoubleSide,
     Line,
     Matrix4,
     Mesh,
@@ -276,7 +278,7 @@ export function serializedPrimitiveToObject(value: SerializedPrimitive): Object3
 
     switch (value.type) {
         case "mesh":
-            object = new Mesh(geometry, new MeshPhongMaterial({ color: "white", toneMapped: false }))
+            object = new Mesh(geometry, new MeshPhongMaterial({ toneMapped: false, color: "white", side: BackSide }))
             break
         case "line":
             object = new Line(geometry)

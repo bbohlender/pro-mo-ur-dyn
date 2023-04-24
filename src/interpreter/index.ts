@@ -310,7 +310,7 @@ function interpreteStochasticSwitch<R>(
     options: InterpreterOptions,
     next: NextCallback<R>
 ): R {
-    const rand = murmurhash.v3(value.variables.index ?? "", options.seed) / _32bit_max_int
+    const rand = Math.random()// murmurhash.v3(value.variables.index ?? "", options.seed) / _32bit_max_int
 
     let sum = 0
     let i = -1
@@ -452,7 +452,7 @@ function interpreteOperation<R>(
         .map(({ raw }) => raw)
 
     if (operation.includeThis) {
-        parameters.unshift(options.cloneValue(value.raw))
+        parameters.unshift(value.raw)
     }
     return operation.execute(next.bind(null, value), transformation.astId!, ...parameters) as R
 }

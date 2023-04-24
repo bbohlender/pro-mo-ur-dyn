@@ -1,27 +1,27 @@
-import { Matrix4 } from "three"
 import { InterpreterOptions, initializeWorker } from "../../../dist/index.js"
-import {
-    MotionEntity,
-    comparePriority,
-    createMotionEntitiy,
-    getMotionEntityProgress,
-    isMotionEntity,
-    operations as motionOperations,
-} from "../../../dist/domains/motion/index.js"
+
 import {
     PointPrimitive,
     Primitive,
     makeTranslationMatrix,
     operations as buildingOperations,
     serializePrimitive,
-} from "../../../dist/domains/building/index.js"
+} from "pro-3d-video/building"
+import {
+    operations as motionOperations,
+    comparePriority,
+    getMotionEntityProgress,
+    isMotionEntity,
+    createMotionEntitiy,
+} from "pro-3d-video/motion"
+import { Pathway, operations as pathwayOperations } from "pro-3d-video/pathway"
+import { Matrix4 } from "three"
 
 export const interpreterOptions: InterpreterOptions = {
     cloneValue(value) {
         if (value instanceof Primitive) {
             return value.clone()
         }
-        //änderung
         return structuredClone(value)
     },
     comparePriority(v1, v2) {
@@ -44,6 +44,11 @@ export const interpreterOptions: InterpreterOptions = {
                 makeTranslationMatrix(variables.x ?? 0, variables.y ?? 0, variables.z ?? 0, new Matrix4())
             )
         }
+        if (variables.type === "pathway") {
+            return {
+                points: [{ x: variables.x ?? 0, y: variables.y ?? 0, size: variables.size ?? 0, astId }],
+            } satisfies Pathway
+        }
         return createMotionEntitiy(variables, astId)
     },
     getComputeProgress(value) {
@@ -55,6 +60,7 @@ export const interpreterOptions: InterpreterOptions = {
     operations: {
         ...buildingOperations,
         ...motionOperations,
+        ...pathwayOperations,
     },
     shouldInterrrupt(startProgress, currentProgress) {
         return currentProgress - startProgress > 3 //3 seconds computed
@@ -64,14 +70,14 @@ export const interpreterOptions: InterpreterOptions = {
     },
     serialize(values, prevProgress, currentProgress) {
         return values.map((value) => {
-            if (isMotionEntity(value.raw)) {
-                //const index = value.raw.keyframes.findIndex((keyframe) => keyframe.t > prevProgress)
-                return { keyframes: value.raw.keyframes /*.slice(index)*/, type: value.raw.type } satisfies MotionEntity
-            }
+            /*if (isMotionEntity(value.raw)) {
+                const index = value.raw.keyframes.findIndex((keyframe) => keyframe.t > prevProgress)
+                return { keyframes: value.raw.keyframes.slice(index), type: value.raw.type } satisfies MotionEntity
+            }*/
             if (value.raw instanceof Primitive) {
                 return serializePrimitive(value.raw)
             }
-            return value
+            return value.raw
         })
     },
 }
