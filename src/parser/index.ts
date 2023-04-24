@@ -14,8 +14,8 @@ export function parse(text: string): NestedDescriptions {
     }
     const descriptions: NestedDescriptions = parser.results[0]
     for (const [identifier, description] of Object.entries(descriptions)) {
-        for (const transformation of Object.values(description.nouns)) {
-            setDescriptionIdentifier(transformation, identifier)
+        for (const noun of Object.values(description.nouns)) {
+            setDescriptionIdentifier(noun.transformation, identifier)
         }
     }
     return descriptions
@@ -67,20 +67,20 @@ export type ParsedOperation = {
 export type ParsedNounReference = {
     type: "nounReference"
     nounId: string
-    descriptionId?: string
+    descriptionId: string
 }
 export type ParsedRaw = {
     type: "raw"
     value: any
-    id?: string
+    astId?: string
 }
 export type ParsedThis = {
     type: "this"
-    id?: string
+    astId?: string
 }
 export type ParsedReturn = {
     type: "return"
-    id?: string
+    astId?: string
 }
 export type ParsedUnaryOperator = {
     type: "!" | "-()"
@@ -131,12 +131,13 @@ export type ParsedDescription = {
 export type ParsedNoun = {
     identifier: string
     tansformationId: string
+    descriptionId: string
 }
 
 export type NestedDescriptions = { [Identifier in string]: NestedDescription }
 export type NestedDescription = {
     rootNounIdentifier: string
-    nouns: { [Identifier in string]: NestedTransformation }
+    nouns: { [Identifier in string]: NestedNoun }
     initialVariables: { [Name in string]: any }
 }
 
@@ -158,75 +159,80 @@ export type NestedTransformation =
     | NestedStochasticSwitch
     | NestedNull
 
+export type NestedNoun = {
+    transformation: NestedTransformation
+    astId?: string
+}
+
 export type NestedNounReference = {
     type: "nounReference"
     nounIdentifier: string
     descriptionIdentifier: string
-    id?: string
+    astId?: string
 }
 export type NestedParallel = {
     type: "parallel"
     children: Array<NestedTransformation>
-    id?: string
+    astId?: string
 }
 export type NestedSequantial = {
     type: "sequential"
     children: Array<NestedTransformation>
-    id?: string
+    astId?: string
 }
 export type NestedOperation = {
     type: "operation"
     children: Array<NestedTransformation>
     identifier: string
-    id?: string
+    astId?: string
 }
 export type NestedPrecomputedOperation = {
     type: "precomputedOperation"
     parameters: Array<any>
     identifier: string
-    id?: string
+    astId?: string
 }
 export type NestedUnaryOperator = {
     type: "!" | "-()"
     children: [value: NestedTransformation]
-    id?: string
+    astId?: string
 }
 export type NestedStochasticSwitch = {
     type: "stochasticSwitch"
     probabilities: Array<number> //should add up to ~1
     children: Array<NestedTransformation>
-    id?: string
+    astId?: string
 }
 export type NestedNull = {
     type: "null"
-    id?: string
+    astId?: string
 }
 export type NestedBinaryOperator = {
     type: "+" | "-" | "*" | "/" | "%" | "&&" | "||" | "==" | "!=" | "<" | "<=" | ">" | ">="
     children: [op1: NestedTransformation, op2: NestedTransformation]
-    id?: string
+    astId?: string
 }
 export type NestedIf = {
     type: "if"
     children: [condition: NestedTransformation, ifValue: NestedTransformation, elseValue: NestedTransformation]
-    id?: string
+    astId?: string
 }
 export type NestedSwitch = {
     type: "switch"
     cases: Array<Array<any>>
     children: Array<NestedTransformation>
-    id?: string
+    astId?: string
 }
 export type NestedSetVariable = {
     type: "setVariable"
     identifier: string
     children: [value: NestedTransformation]
-    id?: string
+    astId?: string
 }
 export type NestedGetVariable = {
     type: "getVariable"
     identifier: string
-    id?: string
+    astId?: string
 }
 
 export * from "./structure.js"

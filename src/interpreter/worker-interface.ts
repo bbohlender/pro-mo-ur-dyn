@@ -15,7 +15,7 @@ export type WorkerMessage =
       }
     | {
           type: WorkerMessageType.Results
-          values: Array<Value>
+          result: any
           isFinal: boolean
       }
 
@@ -31,7 +31,7 @@ export class WorkerInterface {
     constructor(
         private url: URL,
         private options: { credentials?: RequestCredentials; name?: string; type?: WorkerType },
-        private onResult: (values: Array<Value>, isFinal: boolean) => void
+        private onResult: (result: any, isFinal: boolean) => void
     ) {
         this.worker = new Worker(url, options)
         this.worker.onmessage = this.onMessage.bind(this)
@@ -40,7 +40,7 @@ export class WorkerInterface {
     private onMessage(e: MessageEvent<WorkerMessage>) {
         switch (e.data.type) {
             case WorkerMessageType.Results:
-                this.onResult(e.data.values, e.data.isFinal)
+                this.onResult(e.data.result, e.data.isFinal)
                 return
         }
     }

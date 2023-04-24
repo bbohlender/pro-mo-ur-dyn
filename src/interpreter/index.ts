@@ -19,7 +19,7 @@ import { Queue, QueueEntry } from "./queue.js"
 import murmurhash from "murmurhash"
 
 export type Operation = {
-    execute: (next: OperationNextCallback, ...parameters: ReadonlyArray<any>) => any
+    execute: (next: OperationNextCallback, astId: string, ...parameters: ReadonlyArray<any>) => any
     includeThis: boolean
     defaultParameters: Array<() => NestedTransformation>
 }
@@ -35,7 +35,6 @@ export type Operations = {
 
 export type Value = {
     raw: any
-    index: Array<number>
     variables: {
         [Name in string]: any
     }
@@ -57,7 +56,8 @@ export type InterpreterOptions = Readonly<{
      * compares the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
      */
     comparePriority: (v1: unknown, v2: unknown, v1Tr: unknown, v2Tr: unknown) => number
-    createValue: (initialVariables: NestedDescription["initialVariables"]) => any
+    createValue: (initialVariables: NestedDescription["initialVariables"], astId: string) => any
+    serialize: (values: Array<Value>, prevProgress: any, currentProgress: any | undefined) => any
     cloneValue: (value: unknown) => unknown
     operations: Operations
     computeDurationMS: number
@@ -66,37 +66,28 @@ export type InterpreterOptions = Readonly<{
     shouldWait(requestedProgress: any, currentProgress: any): boolean
 }>
 
-function clone(
-    value: Value,
-    { cloneValue }: InterpreterOptions,
-    raw = cloneValue(value.raw),
-    index = value.index,
-    variables = { ...value.variables }
-): Value {
-    return { raw, index, variables }
-}
-
 export function interprete(
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
     references: InterpreterReferences,
-    publishResult: (values: Array<Value>, isLast: boolean) => void
+    publishResult: (values: Array<Value>, prevProgress: any, currentProgress: any) => void
 ): Queue {
     const queue = new Queue(options.comparePriority)
     const descriptionsEntries = Object.entries(descriptions)
     for (let i = 0; i < descriptionsEntries.length; i++) {
         const [identifier, { initialVariables, rootNounIdentifier, nouns }] = descriptionsEntries[i]
-        const rootTransformation = nouns[rootNounIdentifier]
-        if (rootTransformation == null) {
+        console.log("initial varibales")
+        console.log(initialVariables)
+        const noun = nouns[rootNounIdentifier]
+        if (noun == null) {
             throw new Error(`unknown noun "${rootNounIdentifier}" at description "${identifier}"`)
         }
         queue.push({
             value: {
-                index: [i],
-                raw: options.createValue(initialVariables),
-                variables: initialVariables,
+                raw: options.createValue(initialVariables, noun.astId!),
+                variables: { ...initialVariables, index: 0 },
             },
-            stack: [rootTransformation],
+            stack: [noun.transformation],
         })
     }
     interpreteQueueRecursive(queue, descriptions, options, references, publishResult)
@@ -119,9 +110,15 @@ function nextQueued(
     }
     if (Array.isArray(newRaw)) {
         queue.pop()
-        for (const raw of newRaw) {
+        for (let index = 0; index < newRaw.length; index++) {
             queue.push({
-                value: clone(currentEntry.value, options, raw),
+                value: {
+                    raw: newRaw[index],
+                    variables: {
+                        ...currentEntry.value.variables,
+                        index,
+                    },
+                },
                 stack: [...newTransformations, ...currentEntry.stack],
             })
         }
@@ -135,6 +132,13 @@ function nextQueued(
         queue.pop()
         currentEntry.value.raw = newRaw
         queue.push(currentEntry)
+        return
+    }
+
+    if (currentEntry.stack.length === 0) {
+        queue.pop()
+        queue.push(currentEntry)
+        return
     }
 }
 
@@ -143,7 +147,7 @@ export function interpreteQueueRecursive(
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
     references: InterpreterReferences,
-    publishResult: (values: Array<Value>, isLast: boolean) => void
+    publishResult: (values: Array<Value>, prevProgress: any, currentProgress: any) => void
 ) {
     let nextEntry: QueueEntry | undefined = queue.peek()
     if (nextEntry == null) {
@@ -170,7 +174,10 @@ export function interpreteQueueRecursive(
             queue.pop()
             for (const [index, nextTransformation] of transformation.children.entries()) {
                 queue.push({
-                    value: clone(nextEntry.value, options, undefined, [...nextEntry.value.index, index]),
+                    value: {
+                        raw: options.cloneValue(nextEntry.value.raw),
+                        variables: { ...nextEntry.value.variables, index },
+                    },
                     stack: [nextTransformation, ...nextEntry.stack],
                 })
             }
@@ -183,7 +190,11 @@ export function interpreteQueueRecursive(
         }
     }
 
-    publishResult(queue.list.map((entry) => entry.value).concat(queue.results), nextEntry == null)
+    publishResult(
+        queue.list.map((entry) => entry.value).concat(queue.results),
+        progressAtStart,
+        nextEntry == null ? undefined : options.getComputeProgress(nextEntry)
+    )
 
     if (
         nextEntry == null ||
@@ -299,7 +310,7 @@ function interpreteStochasticSwitch<R>(
     options: InterpreterOptions,
     next: NextCallback<R>
 ): R {
-    const rand = murmurhash.v3(value.index.join(","), options.seed) / _32bit_max_int
+    const rand = murmurhash.v3(value.variables.index ?? "", options.seed) / _32bit_max_int
 
     let sum = 0
     let i = -1
@@ -329,7 +340,7 @@ function interpreteSetVariable<R>(
     next: NextCallback<R>
 ): R {
     value.variables[transformation.identifier] = interpreteTransformationSynchronous(
-        clone(value, options),
+        { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
         transformation.children[0],
         descriptions,
         options
@@ -345,7 +356,7 @@ function interpreteSwitch<R>(
     next: NextCallback<R>
 ): R {
     const { raw } = interpreteTransformationSynchronous(
-        clone(value, options),
+        { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
         transformation.children[0],
         descriptions,
         options
@@ -366,13 +377,13 @@ function interpreteNounReference<R>(
     next: NextCallback<R>
 ): R {
     const description = descriptions[transformation.descriptionIdentifier]
-    const nounTransformation = description?.nouns[transformation.nounIdentifier]
-    if (nounTransformation == null) {
+    const noun = description?.nouns[transformation.nounIdentifier]
+    if (noun == null) {
         throw new Error(
             `unknown noun "${transformation.nounIdentifier}" from description "${transformation.descriptionIdentifier}"`
         )
     }
-    return next(value, undefined, nounTransformation)
+    return next(value, undefined, noun.transformation)
 }
 
 function interpreteIf<R>(
@@ -383,7 +394,7 @@ function interpreteIf<R>(
     next: NextCallback<R>
 ): R {
     const conditionOperatorValue = interpreteTransformationSynchronous(
-        clone(value, options),
+        { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
         transformation.children[0],
         descriptions,
         options
@@ -407,7 +418,12 @@ function interpreteBinaryOperator<R>(
     next: NextCallback<R>
 ): R {
     const [v1, v2] = transformation.children.map((child) =>
-        interpreteTransformationSynchronous(clone(value, options), child, descriptions, options)
+        interpreteTransformationSynchronous(
+            { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
+            child,
+            descriptions,
+            options
+        )
     )
     return next(value, binaryOperations[transformation.type](v1.raw, v2.raw))
 }
@@ -425,13 +441,23 @@ function interpreteOperation<R>(
         throw new Error(`unknown operation "${transformation.identifier}"`)
     }
     const parameters = transformation.children
-        .map((child) => interpreteTransformationSynchronous(clone(value, options), child, descriptions, options))
+        .map((child) =>
+            interpreteTransformationSynchronous(
+                { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
+                child,
+                descriptions,
+                options
+            )
+        )
         .map(({ raw }) => raw)
+
+    console.log("this")
+    console.log(value)
 
     if (operation.includeThis) {
         parameters.unshift(options.cloneValue(value.raw))
     }
-    return operation.execute(next.bind(null, value), ...parameters) as R
+    return operation.execute(next.bind(null, value), transformation.astId!, ...parameters) as R
 }
 
 function interpretePrecomputedOperation<R>(
@@ -444,7 +470,7 @@ function interpretePrecomputedOperation<R>(
     if (operation == null) {
         throw new Error(`unknown operation "${transformation.identifier}"`)
     }
-    return operation.execute(next.bind(null, value), ...transformation.parameters) as R
+    return operation.execute(next.bind(null, value), transformation.astId!, ...transformation.parameters) as R
 }
 
 function interpreteRaw<R>(value: Value, transformation: ParsedRaw, next: NextCallback<R>): R {
@@ -464,7 +490,7 @@ function interpreteUnaryOperator<R>(
     next: NextCallback<R>
 ): R {
     const parameter = interpreteTransformationSynchronous(
-        clone(value, options),
+        { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
         transformation.children[0],
         descriptions,
         options
@@ -495,3 +521,4 @@ function interpreteThis<R>(value: Value, next: NextCallback<R>): R {
 export const _32bit_max_int = Math.pow(2, 32)
 
 export * from "./worker-interface.js"
+export * from "./initialize-worker.js"

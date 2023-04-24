@@ -46,7 +46,7 @@ export class Queue {
             return
         }
         let index = this.list.length
-        const newEntryTrans = entry.stack.length > 0 ? entry.stack[0] : undefined
+        const newEntryTrans = entry.stack[0]
         for (let i = 0; i < this.list.length; i++) {
             if (
                 this.compare(

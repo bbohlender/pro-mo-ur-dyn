@@ -3,14 +3,29 @@ import { InterpreterOptions, InterpreterReferences, Value, interprete, interpret
 import { Queue } from "./queue.js"
 import { WorkerMessage, WorkerMessageType } from "./worker-interface.js"
 
-function publishResult(values: Array<Value>, isFinal: boolean) {
-    postMessage({ type: WorkerMessageType.Results, values, isFinal })
+function publishResult(
+    options: InterpreterOptions,
+    values: Array<Value>,
+    prevProgress: any,
+    currentProgress: any | undefined
+) {
+    console.log("resultat:")
+    console.log(values)
+    console.log(prevProgress)
+    console.log(currentProgress)
+    console.log("ende")
+    postMessage({
+        type: WorkerMessageType.Results,
+        result: options.serialize(values, prevProgress, currentProgress),
+        isFinal: currentProgress == null,
+    })
 }
 
 export function initializeWorker(options: InterpreterOptions): void {
     let references: InterpreterReferences | undefined
     let queue: Queue | undefined
     let descriptions: NestedDescriptions | undefined
+    const publish = publishResult.bind(null, options)
     self.onmessage = (e: MessageEvent<WorkerMessage>) => {
         switch (e.data.type) {
             case WorkerMessageType.Interprete:
@@ -21,17 +36,16 @@ export function initializeWorker(options: InterpreterOptions): void {
                     requestedProgress: e.data.requestedProgress,
                 }
                 descriptions = e.data.descriptions
-                queue = interprete(e.data.descriptions, options, references, publishResult)
+                queue = interprete(e.data.descriptions, options, references, publish)
                 return
             case WorkerMessageType.UpdateRequestedProgress:
                 if (queue == null || descriptions == null || references == null) {
                     throw new Error(`unable to update requested progress when interpretation has not yet been started`)
                 }
                 references.requestedProgress = e.data.requestedProgress
-                //verstehe den code nicht
-                //if (references.timeoutRef != null) {
-                interpreteQueueRecursive(queue, descriptions, options, references, publishResult)
-                //}
+                if (references.timeoutRef != null) {
+                    interpreteQueueRecursive(queue, descriptions, options, references, publish)
+                }
                 return
         }
     }

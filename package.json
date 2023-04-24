@@ -5,38 +5,43 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "generate:parser": "nearleyc grammar.ne -o src/parser/parser.ts",
-    "build": "tsc -p build.tsconfig.json",
-    "fix": "run-s fix:prettier fix:eslint",
-    "fix:prettier": "prettier --write 'src/**/*.{ts,tsx}'",
-    "fix:eslint": "eslint src --fix",
-    "test": "nyc mocha ./tests/*.spec.ts --timeout 15000",
-    "test:interpreter": "nyc mocha ./tests/interpreter.spec.ts --timeout 15000"
+      "generate:parser": "nearleyc grammar.ne -o src/parser/parser.ts",
+      "build": "tsc -p build.tsconfig.json",
+      "fix": "run-s fix:prettier fix:eslint",
+      "fix:prettier": "prettier --write 'src/**/*.{ts,tsx}'",
+      "fix:eslint": "eslint src --fix",
+      "test": "nyc mocha ./tests/*.spec.ts --timeout 15000",
+      "test:interpreter": "nyc mocha ./tests/interpreter.spec.ts --timeout 15000"
+    },
+  "exports": {
+      ".": "./dist/index.js",
+      "./motion": "./dist/domains/motion/index.js",
+      "./building": "./dist/domains/building/index.js"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/chai": "^4.3.4",
-    "@types/mocha": "^10.0.1",
-    "@types/moo": "^0.5.5",
-    "@types/nearley": "^2.11.2",
-    "@types/three": "^0.150.1",
-    "@typescript-eslint/eslint-plugin": "^5.57.1",
-    "chai": "^4.3.7",
-    "comlink": "4.4.1",
-    "eslint": "^8.37.0",
-    "mocha": "^10.2.0",
-    "nearley": "^2.20.1",
-    "npm-run-all": "^4.1.5",
-    "nyc": "^15.1.0",
-    "prettier": "^2.8.7",
-    "ts-node": "^10.9.1",
-    "typescript": "^5.0.3"
+      "@types/chai": "^4.3.4",
+      "@types/mocha": "^10.0.1",
+      "@types/moo": "^0.5.5",
+      "@types/nearley": "^2.11.2",
+      "@types/three": "^0.150.1",
+      "@typescript-eslint/eslint-plugin": "^5.57.1",
+      "chai": "^4.3.7",
+      "comlink": "4.4.1",
+      "eslint": "^8.37.0",
+      "mocha": "^10.2.0",
+      "nearley": "^2.20.1",
+      "npm-run-all": "^4.1.5",
+      "nyc": "^15.1.0",
+      "prettier": "^2.8.7",
+      "ts-node": "^10.9.1",
+      "typescript": "^5.0.3"
   },
   "dependencies": {
-    "moo": "^0.5.2",
-    "murmurhash": "^2.0.1",
-    "three": "^0.151.3",
-    "web-worker": "^1.2.0"
+      "moo": "^0.5.2",
+      "murmurhash": "^2.0.1",
+      "three": "^0.151.3",
+      "web-worker": "^1.2.0"
   }
 }

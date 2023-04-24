@@ -1,4 +1,4 @@
 import { initializeWorker } from "../../interpreter/initialize-worker.js"
-import { interpreterOptions } from "./index.js"
+import { arithmeticInterpreterOptions } from "./index.js"
 
-initializeWorker(interpreterOptions)
+initializeWorker(arithmeticInterpreterOptions)

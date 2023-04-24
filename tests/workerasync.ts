@@ -1,7 +1,35 @@
-import { interpreterOptions } from "../src/domains/motion/index.js"
-import { initializeWorker } from "../src/interpreter/initialize-worker.js"
+import { initializeWorker } from "../src/index.js"
+import { operations } from "../src/domains/motion/index.js"
+import { interpreterOptions } from "../web/src/state/worker.js"
+import { Primitive } from "../src/domains/building/primitive.js"
 
 initializeWorker({
     ...interpreterOptions,
-    computeDurationMS: 1,
+    cloneValue(value) {
+        if (value instanceof Primitive) {
+            return value.clone()
+        }
+        //änderung, mocha mag kein structuredClone, deepClone unvollständig
+        return deepClone(value)
+    },
+    computeDurationMS: 10,
+    operations: {
+        ...operations,
+    },
 })
+
+function deepClone(object: unknown) {
+    if (typeof object === "object" && !Array.isArray(object) && object !== null) {
+        let object = {}
+        for (const [key, values] of Object.entries(object)) {
+            if (typeof values === "object" && !Array.isArray(values) && values !== null) {
+                object = { ...object, [key]: { ...values } }
+            } else {
+                object = { ...object, [key]: values }
+            }
+        }
+        return object
+    } else {
+        return object
+    }
+}

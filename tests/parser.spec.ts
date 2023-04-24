@@ -16,6 +16,11 @@ describe("parse grammar", () => {
         }
     })
 
+    it("should flatten and nest description with nouns with the same name", () => {
+        const parsed = parse(`A { a --> 1 } B { a --> 2 }`)
+        expect(nestAST(flattenAST(parsed), false)).to.deep.equal(parsed)
+    })
+
     it("should efficiently parse big grammar", () => {
         expect(() =>
             parse(`

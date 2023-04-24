@@ -1,10 +1,13 @@
-import { InterpreterOptions, Operations } from "../../interpreter/index.js"
+import { InterpreterOptions, Operations, Value } from "../../interpreter/index.js"
 
 const operations: Operations = {}
 
-export const interpreterOptions: InterpreterOptions = {
+export const arithmeticInterpreterOptions: InterpreterOptions = {
     cloneValue(value) {
         return value
+    },
+    serialize(values: Value[], prevProgress: any, currentProgress: any) {
+        return values
     },
     comparePriority(e1, e2, e1Trans, e2Trans) {
         return (e1 as number) - (e2 as number)
