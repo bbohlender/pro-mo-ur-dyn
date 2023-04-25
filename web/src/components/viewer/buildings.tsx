@@ -1,25 +1,15 @@
 import { useEffect, useRef } from "react"
 import { useStore } from "../../state/store.js"
-import { Group } from "three"
-import { isSerializedPrimitive, serializedPrimitiveToObject } from "pro-3d-video/building"
+import { BackSide } from "three"
 
 export function Buildings() {
-    const result = useStore((state) => state.result)
-    const ref = useRef<Group>(null)
-    useEffect(() => {
-        const group = ref.current
-        if (group == null) {
-            return
-        }
-        for (const value of result) {
-            if (!isSerializedPrimitive(value)) {
-                continue
-            }
-            group.add(serializedPrimitiveToObject(value))
-        }
-        return () => {
-            group.clear()
-        }
-    }, [result])
-    return <group ref={ref}></group>
+    const geometry = useStore((state) => state.result.buildings)
+    if (geometry == null) {
+        return null
+    }
+    return (
+        <mesh geometry={geometry}>
+            <meshPhongMaterial toneMapped={false} side={BackSide} color="white" />
+        </mesh>
+    )
 }

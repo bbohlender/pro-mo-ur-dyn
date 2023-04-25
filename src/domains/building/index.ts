@@ -1,9 +1,8 @@
 import {
     BackSide,
     Box3,
+    BufferGeometry,
     BufferGeometryLoader,
-    Color,
-    DoubleSide,
     Line,
     Matrix4,
     Mesh,
@@ -16,13 +15,14 @@ import {
     Vector3,
 } from "three"
 import * as THREE from "three"
-import { FacePrimitive, ObjectPrimitive, PointPrimitive, Primitive } from "./primitive.js"
+import { FacePrimitive, PointPrimitive, Primitive } from "./primitive.js"
 //import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 //import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js"
 import { computeGableRoof } from "./roof.js"
 import { Axis, getDirection, Split } from "./primitive-utils.js"
 import { OperationNextCallback, Operations } from "../../index.js"
 import { makeRotationMatrix, makeScaleMatrix, makeTranslationMatrix } from "./math.js"
+import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 
 THREE.Cache.enabled = true
 
@@ -177,6 +177,7 @@ export const operations: Operations = {
     translate: {
         execute: computeTranslate,
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [
             () => ({ type: "raw", value: 0 }),
             () => ({ type: "raw", value: 0 }),
@@ -186,6 +187,7 @@ export const operations: Operations = {
     scale: {
         execute: computeScale,
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [
             () => ({ type: "raw", value: 1 }),
             () => ({ type: "raw", value: 1 }),
@@ -195,6 +197,7 @@ export const operations: Operations = {
     rotate: {
         execute: computeRotate,
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [
             () => ({ type: "raw", value: 0 }),
             () => ({ type: "raw", value: 0 }),
@@ -204,11 +207,13 @@ export const operations: Operations = {
     extrude: {
         execute: computeExtrude,
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [() => ({ type: "raw", value: 1 })],
     },
     split: {
         execute: computeSplit,
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [
             () => ({ type: "raw", value: "x" }),
             () => ({ type: "raw", value: true }),
@@ -218,31 +223,37 @@ export const operations: Operations = {
     toFaces: {
         execute: computeComponents.bind(null, "faces"),
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [],
     },
     sample: {
         execute: computeSample,
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [() => ({ type: "raw", value: 10 })],
     },
     size: {
         execute: computeSize,
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [() => ({ type: "raw", value: "x" })],
     },
     point2: {
         execute: computePoint2,
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [() => ({ type: "raw", value: 0 }), () => ({ type: "raw", value: 0 })],
     },
     face: {
         execute: computeFace,
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [],
     },
     gableRoof: {
         execute: computeGableRoof,
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [
             () => ({
                 type: "raw",
@@ -253,56 +264,22 @@ export const operations: Operations = {
     direction: {
         execute: computeDirection,
         includeThis: true,
+        includeQueue: false,
         defaultParameters: [],
     },
 }
 
-export type SerializedPrimitive = {
-    type: "point" | "mesh" | "line"
-    matrix: Array<number>
-    geometry: object
+export function isPrimitive(value: any): value is Primitive {
+    return value instanceof Primitive
 }
 
-const loader = new BufferGeometryLoader()
-
-export function isSerializedPrimitive(value: any): value is SerializedPrimitive {
-    return "type" in value && "matrix" in value && "geometry" in value
-}
-
-const matrixHelper = new Matrix4()
-
-export function serializedPrimitiveToObject(value: SerializedPrimitive): Object3D {
-    const geometry = loader.parse(value.geometry)
-
-    let object: Object3D
-
-    switch (value.type) {
-        case "mesh":
-            object = new Mesh(geometry, new MeshPhongMaterial({ toneMapped: false, color: "white", side: BackSide }))
-            break
-        case "line":
-            object = new Line(geometry)
-            break
-        case "point":
-            object = new Points(geometry)
-            break
-        default:
-            throw new Error(`unknown value type "${value.type} for serialized primitive"`)
+export function primitivesToGeometry(primitives: Array<Primitive>): BufferGeometry | null {
+    if(primitives.length === 0) {
+        return null
     }
-
-    matrixHelper.fromArray(value.matrix).decompose(object.position, object.quaternion, object.scale)
-    return object
-}
-
-export function serializePrimitive(primitive: Primitive): SerializedPrimitive {
-    const geometry = primitive.getGeometry()
-    if (primitive instanceof PointPrimitive) {
-        return { type: "point", matrix: primitive.matrix.toArray(), geometry: geometry.toJSON() }
-    } /*else if (value.raw instanceof LinePri) {
-                    return { type: "line", geometry: (geometry as Line<BufferGeometry>).geometry.toJSON() }
-                } */ else {
-        return { type: "mesh", matrix: primitive.matrix.toArray(), geometry: geometry.toJSON() }
-    }
+    return mergeBufferGeometries(
+        primitives.map((primitive) => primitive.getGeometry().clone().applyMatrix4(primitive.matrix))
+    )
 }
 
 export * from "./math.js"

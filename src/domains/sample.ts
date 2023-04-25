@@ -38,7 +38,8 @@ export function sampleGeometry(geometry: BufferGeometry, amount: number): Array<
     const positionAttribute = geometry.getAttribute("position") as BufferAttribute | InterleavedBufferAttribute
     const areas = new Array(positionAttribute.count / 3)
         .fill(null)
-        .map((_, i) => getTriangle(i, positionAttribute, _triangle).getArea())
+        .map((_, i) => nanToZero(getTriangle(i, positionAttribute, _triangle).getArea()))
+    
     const amounts = distributeOverSizes(areas, amount)
     const result: Array<Vector3> = []
     for (let index = 0; index < amounts.length; index++) {
@@ -62,6 +63,10 @@ export function distributeOverSizes(sizes: Array<number>, amount: number): Array
         amounts[index] = (amounts[index] ?? 0) + 1
     }
     return amounts
+}
+
+function nanToZero(value: number): number {
+    return isNaN(value) ? 0 : value
 }
 
 function randomIndexBySize(sizes: Array<number>, sum: number): number {

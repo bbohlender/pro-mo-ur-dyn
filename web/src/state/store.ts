@@ -13,6 +13,7 @@ import type x from "zustand"
 import { combine } from "zustand/middleware"
 import { clamp } from "three/src/math/MathUtils.js"
 import { isMotionEntity } from "pro-3d-video/motion"
+import { BufferGeometryLoader } from "three"
 
 const createZustand = create as any as typeof x.default
 
@@ -21,9 +22,11 @@ export type AppState = {
     time: number
     duration: number
     playing: boolean
-    result: Array<any>
+    result: any
     interpretationFinished: boolean
 }
+
+const loader = new BufferGeometryLoader()
 
 const defaultDescription = parse(`Default (interprete: false) {
 Building-->
@@ -51,16 +54,23 @@ export const useStore = createZustand(
             set({ playing: !get().playing })
         },
 
-        replaceResult(result: Array<any>, final: boolean) {
+        replaceResult({ agents = [], buildings, pathways }: any, final: boolean) {
             let duration = 0
 
-            for (const value of result) {
-                if (isMotionEntity(value)) {
-                    duration = Math.max(duration, value.keyframes[value.keyframes.length - 1].t)
-                }
+            for (const value of agents) {
+                duration = Math.max(duration, value.keyframes[value.keyframes.length - 1].t)
             }
 
-            set({ result, duration, time: clamp(get().time, 0, duration), interpretationFinished: final })
+            set({
+                result: {
+                    agents,
+                    buildings: buildings == null ? undefined : loader.parse(buildings),
+                    pathways: pathways == null ? undefined : loader.parse(pathways),
+                },
+                duration,
+                time: clamp(get().time, 0, duration),
+                interpretationFinished: final,
+            })
         },
 
         //TODO: appendResult(results: Array<Value>) {},

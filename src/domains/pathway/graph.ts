@@ -1,8 +1,9 @@
-import { Vector3, Matrix4, Quaternion, Shape, Mesh, ShapeGeometry, MeshPhongMaterial, BackSide, MeshBasicMaterial } from "three"
+import { Vector3, Matrix4, Shape, ShapeGeometry, BufferGeometry } from "three"
 import { filterNull } from "../../util.js"
 import { makeTranslationMatrix } from "../building/math.js"
-import { Primitive, FacePrimitive, swapYZ } from "../building/primitive.js"
+import { swapYZ } from "../building/primitive.js"
 import { Pathway } from "./index.js"
+import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 
 const vectorHelper = new Vector3()
 
@@ -63,38 +64,39 @@ type Graph = {
     connectionsList: Array<Array<number> | undefined>
 }
 
-export function expandGraph(graph: Graph, normal: Vector3 = YUP): Array<Mesh> {
+export function expandGraph(graph: Graph, normal: Vector3 = YUP): BufferGeometry | null {
     if (graph.points.length === 0) {
-        return []
+        return null
     }
     const visited = new Set<string>()
-    return graph.connectionsList.reduce<Array<Mesh>>((prev, connections, pointIndex) => {
-        if (connections == null) {
+    return mergeBufferGeometries(
+        graph.connectionsList.reduce<Array<BufferGeometry>>((prev, connections, pointIndex) => {
+            if (connections != null) {
+                prev?.push(
+                    ...connections
+                        .map((otherPointIndex, connectionIndex) => {
+                            const key1 = `${otherPointIndex}/${pointIndex}`
+                            const key2 = `${pointIndex}/${otherPointIndex}`
+                            if (visited.has(key1) || visited.has(key2)) {
+                                return undefined
+                            }
+                            visited.add(key1)
+                            return generateFaces(
+                                graph,
+                                pointIndex,
+                                connections,
+                                connectionIndex,
+                                10 /*distance*/,
+                                0 /*offset*/,
+                                normal
+                            )
+                        })
+                        .filter(filterNull)
+                )
+            }
             return prev
-        }
-        return [
-            ...prev,
-            ...connections
-                .map((otherPointIndex, connectionIndex) => {
-                    const key1 = `${otherPointIndex}/${pointIndex}`
-                    const key2 = `${pointIndex}/${otherPointIndex}`
-                    if (visited.has(key1) || visited.has(key2)) {
-                        return undefined
-                    }
-                    visited.add(key1)
-                    return generateFaces(
-                        graph,
-                        pointIndex,
-                        connections,
-                        connectionIndex,
-                        10 /*distance*/,
-                        0 /*offset*/,
-                        normal
-                    )
-                })
-                .filter(filterNull),
-        ]
-    }, [])
+        }, [])
+    )
 }
 
 const globalToLocal = new Matrix4()
@@ -111,7 +113,7 @@ export function generateFaces(
     distance: Array<number> | number,
     offset: Array<number> | number,
     normal: Vector3
-): Mesh {
+): BufferGeometry {
     const otherPointIndex = connections[connectionIndex]
     const shape = new Shape()
     const matrix = new Matrix4()
@@ -150,9 +152,8 @@ export function generateFaces(
     )
     const geometry = new ShapeGeometry(shape)
     swapYZ(geometry)
-    const mesh = new Mesh(geometry, new MeshPhongMaterial({ toneMapped: false, side: BackSide, color: "gray" }))
-    matrix.decompose(mesh.position, mesh.quaternion, mesh.scale)
-    return mesh
+    geometry.applyMatrix4(matrix)
+    return geometry
 }
 
 const v1 = new Vector3()

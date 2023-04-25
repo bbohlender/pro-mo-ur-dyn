@@ -1,7 +1,8 @@
-import { KeyframeTrack, Object3D } from "three"
-import { isSerializedPrimitive, serializedPrimitiveToObject } from "./index.js"
+import { KeyframeTrack, Mesh, MeshPhongMaterial, Object3D } from "three"
 
-export function exportGLTF(values: Array<unknown>, objects: Array<Object3D>, tracks: Array<KeyframeTrack>): void {
-    const buildings = values.filter(isSerializedPrimitive)
-    objects.push(...buildings.map((value, i) => serializedPrimitiveToObject(value)))
+export function exportGLTF(result: any, objects: Array<Object3D>, tracks: Array<KeyframeTrack>): void {
+    if (!("buildings" in result)) {
+        return
+    }
+    objects.push(new Mesh(result.buildings, new MeshPhongMaterial({ color: "white", toneMapped: false })))
 }

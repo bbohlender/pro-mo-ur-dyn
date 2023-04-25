@@ -1,12 +1,20 @@
+import { Vector3 } from "three"
 import { InterpreterOptions, OperationNextCallback, Operations } from "../../interpreter/index.js"
+import { getEntityPositionAt } from "./helper.js"
+import { getPathwaysGeometry, isPathway } from "../pathway/index.js"
+import { Queue } from "../../interpreter/queue.js"
+import { sampleGeometry } from "../sample.js"
 
-const TIME_STEP = 100 //ms
+const TIME_STEP = 0.1 //ms
 const RADIUS = 0.1 //meter
+
+const positionHelper = new Vector3()
 
 export const operations: Operations = {
     moveTo: {
         defaultParameters: [],
         includeThis: true,
+        includeQueue: false,
         execute: (
             next: OperationNextCallback,
             astId: string,
@@ -23,6 +31,7 @@ export const operations: Operations = {
     },
     later: {
         defaultParameters: [],
+        includeQueue: false,
         execute: (next, astId, entity: MotionEntity, t: number) => {
             entity.keyframes[entity.keyframes.length - 1].t += t
             return next(entity)
@@ -31,13 +40,56 @@ export const operations: Operations = {
     },
     clone: {
         defaultParameters: [],
-        execute: (next, astId, entity: MotionEntity, a: number) => {
-            return next(new Array(a).fill(null).map(() => structuredClone(entity)))
+        includeQueue: false,
+        execute: (next, astId, entity: MotionEntity, amount: number) => {
+            return next(new Array(amount).fill(null).map(() => structuredClone(entity)))
         },
+        includeThis: true,
+    },
+    pointOnPathway: {
+        defaultParameters: [],
+        execute: (next, astId, ...parameters) => {
+            //TODO
+        },
+        includeQueue: true,
+        includeThis: true,
+    },
+    pathTo: {
+        defaultParameters: [],
+        execute: () => {
+            //TODO
+        },
+        includeQueue: true,
+        includeThis: true,
+    },
+    spawnOnPathway: {
+        defaultParameters: [],
+        execute: (next, astId, entity: MotionEntity, queue: Queue, amount = 1) => {
+            const pathwayGeometry = getPathwaysGeometry(queue)
+            if (pathwayGeometry == null) {
+                return next([])
+            }
+            return next(
+                sampleGeometry(pathwayGeometry, amount).map<MotionEntity>(({ x, y, z }) => ({
+                    keyframes: [
+                        {
+                            x,
+                            y,
+                            z,
+                            astId,
+                            t: entity.keyframes[entity.keyframes.length - 1].t,
+                        },
+                    ],
+                    type: entity.type,
+                }))
+            )
+        },
+        includeQueue: true,
         includeThis: true,
     },
     wait: {
         defaultParameters: [],
+        includeQueue: false,
         execute: (next, astId, entity: MotionEntity, t: number) => {
             const { x, y, z, t: oldT } = entity.keyframes[entity.keyframes.length - 1]
             entity.keyframes.push({
@@ -54,6 +106,7 @@ export const operations: Operations = {
     moveBy: {
         defaultParameters: [],
         includeThis: true,
+        includeQueue: false,
         execute: (
             next: OperationNextCallback,
             astId: string,
@@ -71,10 +124,12 @@ export const operations: Operations = {
     moveToAndDodge: {
         defaultParameters: [],
         includeThis: true,
+        includeQueue: true,
         execute: (
             next: OperationNextCallback,
             astId: string,
             entity: MotionEntity,
+            queue: Queue,
             targetX: number,
             targetY: number,
             targetZ: number,
@@ -85,22 +140,29 @@ export const operations: Operations = {
             const dx = targetX - x
             const dy = targetY - y
             const dz = targetZ - z
-            const timeRatio = timeStep / dt
-            const newX = x + dx * timeRatio
-            const newY = y + dy * timeRatio
-            const newZ = z + dz * timeRatio
+            const stepsLeft = dt / timeStep
+            const newX = x + dx / stepsLeft
+            const newY = y + dy / stepsLeft
+            const newZ = z + dz / stepsLeft
 
             let nextX = x,
                 nextY = y,
                 nextZ = z
-            if (true) {
-                //TODO: check collide
+            const nextT = t + timeStep
+            if (
+                !isColliding(
+                    queue.list.map(({ value: { raw } }) => raw).concat(queue.results.map(({ raw }) => raw)),
+                    entity.type,
+                    positionHelper.set(newX, newY, newZ),
+                    nextT
+                )
+            ) {
                 //not collide
                 nextX = newX
                 nextY = newY
                 nextZ = newZ
             }
-            entity.keyframes.push({ x: nextX, y: nextY, z: nextZ, t: t + timeStep, astId })
+            entity.keyframes.push({ x: nextX, y: nextY, z: nextZ, t: nextT, astId })
 
             if (dt <= TIME_STEP) {
                 return next(entity) //done
@@ -113,6 +175,23 @@ export const operations: Operations = {
             }) //schedule again
         },
     },
+}
+
+const targetEntityPositionHelper = new Vector3()
+
+function isColliding(environment: Array<any>, type: MotionEntityType, position: Vector3, time: number) {
+    for (const value of environment) {
+        if (isMotionEntity(value)) {
+            if (!getEntityPositionAt(value.keyframes, time, targetEntityPositionHelper, TIME_STEP + 0.001)) {
+                continue
+            }
+            const distance = position.distanceTo(targetEntityPositionHelper)
+            if (distance < 1) {
+                return true
+            }
+        }
+    }
+    return false
 }
 
 export function compareMotionEntityPriority(e1: MotionEntity, e2: MotionEntity) {

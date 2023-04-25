@@ -5,13 +5,13 @@ import { WorkerMessage, WorkerMessageType } from "./worker-interface.js"
 
 function publishResult(
     options: InterpreterOptions,
-    values: Array<Value>,
+    queue: Queue,
     prevProgress: any,
     currentProgress: any | undefined,
 ) {
     postMessage({
         type: WorkerMessageType.Results,
-        result: options.serialize(values, prevProgress, currentProgress),
+        result: options.serialize(queue, prevProgress, currentProgress),
         isFinal: currentProgress === undefined
     })
 }

@@ -17,6 +17,8 @@ export class Queue {
 
     public readonly results: Array<Value> = []
 
+    public readonly resultCache: { [Key in string]: any } = {}
+
     /**
      *
      * @param compare should compare the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)

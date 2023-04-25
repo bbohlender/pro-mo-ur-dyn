@@ -1,10 +1,11 @@
 import { initializeWorker } from "pro-3d-video"
 import {
     operations as buildingOperations,
+    isPrimitive,
     makeTranslationMatrix,
     PointPrimitive,
     Primitive,
-    serializePrimitive,
+    primitivesToGeometry,
 } from "pro-3d-video/building"
 import {
     operations as motionOperations,
@@ -13,8 +14,10 @@ import {
     isMotionEntity,
     createMotionEntitiy,
 } from "pro-3d-video/motion"
-import { Pathway, operations as pathwayOperations } from "pro-3d-video/pathway"
-import { Matrix4 } from "three"
+import { isPathway, Pathway, operations as pathwayOperations, pathwaysToGeometry } from "pro-3d-video/pathway"
+import { BufferGeometryLoader, Matrix4 } from "three"
+
+const loader = new BufferGeometryLoader()
 
 initializeWorker({
     cloneValue(value) {
@@ -59,7 +62,7 @@ initializeWorker({
     operations: {
         ...buildingOperations,
         ...motionOperations,
-        ...pathwayOperations
+        ...pathwayOperations,
     },
     shouldInterrrupt(startProgress, currentProgress) {
         return currentProgress - startProgress > 3 //3 seconds computed
@@ -67,16 +70,22 @@ initializeWorker({
     shouldWait(requestedProgress, currentProgress) {
         return requestedProgress <= currentProgress
     },
-    serialize(values, prevProgress, currentProgress) {
-        return values.map((value) => {
+    serialize(queue, prevProgress, currentProgress) {
+        const all = queue.list.map(({ value: { raw } }) => raw).concat(queue.results.map(({ raw }) => raw))
+        return {
+            buildings: (queue.resultCache.buildings ?? primitivesToGeometry(all.filter(isPrimitive)))?.toJSON(),
+            pathways: (queue.resultCache.pathways ?? pathwaysToGeometry(all.filter(isPathway)))?.toJSON(),
+            agents: all.filter(isMotionEntity),
+        }
+        /*return values.map((value) => {
             /*if (isMotionEntity(value.raw)) {
                 const index = value.raw.keyframes.findIndex((keyframe) => keyframe.t > prevProgress)
                 return { keyframes: value.raw.keyframes.slice(index), type: value.raw.type } satisfies MotionEntity
-            }*/
+            }
             if (value.raw instanceof Primitive) {
                 return serializePrimitive(value.raw)
             }
             return value.raw
-        })
+        })*/
     },
 })

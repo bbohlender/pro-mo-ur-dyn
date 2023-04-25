@@ -1,6 +1,8 @@
-import { KeyframeTrack, Object3D } from "three"
-import { pathwaysToObject3ds, isPathway } from "./index.js"
+import { KeyframeTrack, Mesh, MeshPhongMaterial, Object3D } from "three"
 
-export function exportGLTF(values: Array<unknown>, objects: Array<Object3D>, tracks: Array<KeyframeTrack>): void {
-    objects.push(...pathwaysToObject3ds(values.filter(isPathway)))
+export function exportGLTF(result: any, objects: Array<Object3D>, tracks: Array<KeyframeTrack>): void {
+    if (!("pathways" in result)) {
+        return
+    }
+    objects.push(new Mesh(result.pathways, new MeshPhongMaterial({ toneMapped: false, color: "gray" })))
 }

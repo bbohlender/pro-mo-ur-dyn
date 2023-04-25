@@ -1,20 +1,14 @@
-import { useEffect, useRef } from "react"
+import { BackSide } from "three"
 import { useStore } from "../../state/store.js"
-import { Group } from "three"
-import { isPathway, pathwaysToObject3ds } from "pro-3d-video/pathway"
 
 export function Pathways() {
-    const result = useStore((state) => state.result)
-    const ref = useRef<Group>(null)
-    useEffect(() => {
-        const group = ref.current
-        if (group == null) {
-            return
-        }
-        group.add(...pathwaysToObject3ds(result.filter(isPathway)))
-        return () => {
-            group.clear()
-        }
-    }, [result])
-    return <group ref={ref}></group>
+    const geometry = useStore((state) => state.result.pathways)
+    if (geometry == null) {
+        return null
+    }
+    return (
+        <mesh geometry={geometry}>
+            <meshPhongMaterial toneMapped={false} side={BackSide} color="gray" />
+        </mesh>
+    )
 }

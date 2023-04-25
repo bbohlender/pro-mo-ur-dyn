@@ -13,7 +13,7 @@ export default function App() {
         <>
             <Canvas
                 shadows
-                gl={{ logarithmicDepthBuffer: true, antialias: false }}
+                gl={{ logarithmicDepthBuffer: true, antialias: true }}
                 camera={{ far: 10000 }}
                 style={{ width: "100vw", height: "100svh" }}>
                 <ambientLight intensity={0.5} />

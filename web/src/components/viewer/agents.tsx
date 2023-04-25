@@ -14,7 +14,7 @@ import {
     Quaternion,
     Vector3,
 } from "three"
-import { getEntityPositionAt, isMotionEntity } from "pro-3d-video/motion"
+import { MotionEntity, getEntityPositionAt, isMotionEntity } from "pro-3d-video/motion"
 import { useStore } from "../../state/store.js"
 
 const geometry = new BoxGeometry()
@@ -34,7 +34,10 @@ export function Agents() {
             return
         }
 
-        const { result, duration } = useStore.getState()
+        const {
+            result: { agents = [] },
+            duration,
+        } = useStore.getState()
 
         const state = useStore.getState()
         state.duration = duration
@@ -43,10 +46,7 @@ export function Agents() {
         }
 
         ref.current.count = 0
-        for (const value of result) {
-            if (!isMotionEntity(value)) {
-                continue
-            }
+        for (const value of agents ?? []) {
             const isPresent = getEntityPositionAt(value.keyframes, state.time, translateHelper)
             if (!isPresent) {
                 continue
@@ -72,18 +72,14 @@ export function Agents() {
 const lineMaterial = new LineBasicMaterial({ color: "black" })
 
 export function Paths() {
-    const result = useStore((state) => state.result)
+    const agents = (useStore((state) => state.result.agents) as Array<MotionEntity>) ?? []
     const ref = useRef<Group>(null)
     useEffect(() => {
         if (ref.current == null) {
             return
         }
         const group = ref.current
-        for (const value of result) {
-            if (!isMotionEntity(value)) {
-                continue
-            }
-
+        for (const value of agents) {
             const points: Array<Vector3> = []
 
             for (let i = 1; i < value.keyframes.length; i++) {
@@ -97,6 +93,6 @@ export function Paths() {
         return () => {
             group.clear()
         }
-    }, [result])
+    }, [agents])
     return <group ref={ref} />
 }
