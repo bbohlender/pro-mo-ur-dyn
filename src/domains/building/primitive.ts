@@ -206,7 +206,7 @@ export class FacePrimitive extends Primitive {
 
     protected computeGeometry(): BufferGeometry {
         const geometry = new ShapeGeometry(this.shape)
-        //invertWinding(geometry)
+        invertWinding(geometry)
         swapYZ(geometry)
         const resultGeometry = new BufferGeometry()
         resultGeometry.attributes = geometry.attributes
@@ -329,12 +329,12 @@ export function swapYZ(geometry: BufferGeometry): void {
 
 
         temp = normalAttribute.getY(i)
-        normalAttribute.setY(i, -normalAttribute.getZ(i))
+        normalAttribute.setY(i, normalAttribute.getZ(i))
         normalAttribute.setZ(i, temp)
     }
 }
 
-function invertWinding(geometry: BufferGeometry): void {
+export function invertWinding(geometry: BufferGeometry): void {
     let temp: number
     for (let i = 0; i < geometry.index!.count; i += 3) {
         // swap the first and third values

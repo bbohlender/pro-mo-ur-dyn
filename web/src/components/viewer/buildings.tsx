@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
 import { useStore } from "../../state/store.js"
-import { BackSide } from "three"
+import { BackSide, DoubleSide } from "three"
 
 export function Buildings() {
     const geometry = useStore((state) => state.result.buildings)
@@ -9,7 +9,7 @@ export function Buildings() {
     }
     return (
         <mesh geometry={geometry}>
-            <meshPhongMaterial toneMapped={false} side={BackSide} color="white" />
+            <meshPhongMaterial toneMapped={false} color="white" />
         </mesh>
     )
 }

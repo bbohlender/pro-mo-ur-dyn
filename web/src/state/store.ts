@@ -29,8 +29,7 @@ export type AppState = {
 const loader = new BufferGeometryLoader()
 
 const defaultDescription = parse(`Default (interprete: false) {
-Building-->
-    extrude( { 33%: 5 33%: 7 34%: 9 } )
+    Building--> this
 }`)
 
 const initialState: AppState = {

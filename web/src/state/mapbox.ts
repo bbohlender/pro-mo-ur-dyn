@@ -202,21 +202,31 @@ export function convertLotsToDescriptions(layers: Layers): NestedDescriptions {
         if (transformations.length === 0) {
             continue
         }
+        const children: Array<NestedTransformation> = [
+            transformations.length === 1
+                ? transformations[0]
+                : {
+                      type: "parallel",
+                      children: transformations,
+                  },
+        ]
+        if (feature.properties.extrude === "true" && "height" in feature.properties) {
+            children.push(
+                {
+                    type: "operation",
+                    identifier: "extrude",
+                    children: [{ type: "raw", value: feature.properties.height }],
+                },
+                { type: "nounReference", nounIdentifier: "Building", descriptionIdentifier: "Default" }
+            )
+        }
         descriptions[`Building-${i}`] = {
             initialVariables: { type: "building" },
             nouns: {
                 Start: {
                     transformation: {
                         type: "sequential",
-                        children: [
-                            transformations.length === 1
-                                ? transformations[0]
-                                : {
-                                      type: "parallel",
-                                      children: transformations,
-                                  },
-                            { type: "nounReference", nounIdentifier: "Building", descriptionIdentifier: "Default" },
-                        ],
+                        children,
                     },
                 },
             },

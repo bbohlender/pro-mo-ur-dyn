@@ -8,7 +8,7 @@ export function Pathways() {
     }
     return (
         <mesh geometry={geometry}>
-            <meshPhongMaterial toneMapped={false} side={BackSide} color="gray" />
+            <meshPhongMaterial toneMapped={false} color="gray" />
         </mesh>
     )
 }

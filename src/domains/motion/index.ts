@@ -4,6 +4,7 @@ import { getEntityPositionAt } from "./helper.js"
 import { getPathwaysGeometry, isPathway } from "../pathway/index.js"
 import { Queue } from "../../interpreter/queue.js"
 import { sampleGeometry } from "../sample.js"
+import { findPathTo } from "./pathfinding.js"
 
 const TIME_STEP = 0.1 //ms
 const RADIUS = 0.1 //meter
@@ -46,18 +47,37 @@ export const operations: Operations = {
         },
         includeThis: true,
     },
-    pointOnPathway: {
+    randomPointOnPathway: {
         defaultParameters: [],
-        execute: (next, astId, ...parameters) => {
-            //TODO
+        execute: (next, astId, queue: Queue) => {
+            const pathwayGeometry = getPathwaysGeometry(queue)
+            if (pathwayGeometry == null) {
+                return next(null)
+            }
+            const [{ x, y, z }] = sampleGeometry(pathwayGeometry, 1)
+            return next({ x, y, z })
         },
         includeQueue: true,
-        includeThis: true,
+        includeThis: false,
     },
     pathTo: {
         defaultParameters: [],
-        execute: () => {
-            //TODO
+        execute: (
+            next,
+            astId,
+            entity: MotionEntity,
+            queue: Queue,
+            { x, y, z }: { x: number; y: number; z: number }
+        ) => {
+            const path = findPathTo(queue, entity.keyframes[entity.keyframes.length - 1], x, y, z)
+            if (path != null) {
+                let t = entity.keyframes[entity.keyframes.length - 1].t
+                for (const { x, y, z } of path) {
+                    t += 1
+                    entity.keyframes.push({ astId, x, y, z, t })
+                }
+            }
+            return next(entity)
         },
         includeQueue: true,
         includeThis: true,

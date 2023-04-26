@@ -1,13 +1,16 @@
-import { Vector3, Matrix4, Shape, ShapeGeometry, BufferGeometry } from "three"
+import { Vector3, Matrix4, Shape, ShapeGeometry, BufferGeometry, Vector2, Line, Line3 } from "three"
 import { filterNull } from "../../util.js"
 import { makeTranslationMatrix } from "../building/math.js"
-import { swapYZ } from "../building/primitive.js"
+import { invertWinding, swapYZ } from "../building/primitive.js"
 import { Pathway } from "./index.js"
-import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
+import { mergeBufferGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 
 const vectorHelper = new Vector3()
 
 function addConnectionToGraph(connectionsList: Array<Array<number>>, i1: number, i2: number): void {
+    if (i1 === i2) {
+        return
+    }
     let connections = connectionsList[i1]
     if (connections == null) {
         connections = []
@@ -64,46 +67,262 @@ type Graph = {
     connectionsList: Array<Array<number> | undefined>
 }
 
+function fromV3({ x, z }: Vector3, to: Vector2): Vector2 {
+    return to.set(x, z)
+}
+
+const centerHelper = new Vector2()
+const fromHelper = new Vector2()
+const toHelper = new Vector2()
+
+const empty = new Vector2()
+
 export function expandGraph(graph: Graph, normal: Vector3 = YUP): BufferGeometry | null {
     if (graph.points.length === 0) {
         return null
     }
     const visited = new Set<string>()
-    return mergeBufferGeometries(
-        graph.connectionsList.reduce<Array<BufferGeometry>>((prev, connections, pointIndex) => {
-            if (connections != null) {
-                prev?.push(
-                    ...connections
-                        .map((otherPointIndex, connectionIndex) => {
-                            const key1 = `${otherPointIndex}/${pointIndex}`
-                            const key2 = `${pointIndex}/${otherPointIndex}`
-                            if (visited.has(key1) || visited.has(key2)) {
-                                return undefined
-                            }
-                            visited.add(key1)
-                            return generateFaces(
-                                graph,
-                                pointIndex,
-                                connections,
-                                connectionIndex,
-                                10 /*distance*/,
-                                0 /*offset*/,
-                                normal
+    const g = mergeBufferGeometries(
+        graph.connectionsList
+            .map<BufferGeometry | undefined>((otherPointIndicies, pointIndex) => {
+                if (otherPointIndicies == null || otherPointIndicies.length < 3) {
+                    return undefined
+                }
+                fromV3(graph.points[pointIndex], centerHelper)
+                const shape = new Shape(
+                    otherPointIndicies
+                        .map((otherPointIndex, i) => {
+                            const result = new Vector2()
+                            const nextPointIndex = otherPointIndicies[(i + 1) % otherPointIndicies.length]
+                            return computeStreetBoundaryIntersection(
+                                centerHelper,
+                                10,
+                                fromV3(graph.points[otherPointIndex], fromHelper),
+                                10,
+                                fromV3(graph.points[nextPointIndex], toHelper),
+                                10,
+                                result
                             )
                         })
                         .filter(filterNull)
                 )
-            }
-            return prev
-        }, [])
+                const geometry = new ShapeGeometry(shape)
+                swapYZ(geometry)
+                invertWinding(geometry)
+                return geometry
+            })
+            .filter(filterNull)
+            .concat(
+                graph.connectionsList.reduce<Array<BufferGeometry>>((prev, connections, pointIndex) => {
+                    if (connections != null) {
+                        prev.push(
+                            ...connections
+                                .map((otherPointIndex, toConnectionIndex) => {
+                                    const key1 = `${otherPointIndex}/${pointIndex}`
+                                    const key2 = `${pointIndex}/${otherPointIndex}`
+                                    if (visited.has(key1) || visited.has(key2)) {
+                                        return undefined
+                                    }
+                                    visited.add(key1)
+                                    const otherConnections = graph.connectionsList[otherPointIndex]!
+                                    const otherToConnectionIndex = otherConnections.findIndex(
+                                        (pIndex) => pointIndex === pIndex
+                                    )
+                                    const shape = new Shape([
+                                        ...streetStartPoints(graph.points, pointIndex, toConnectionIndex, connections),
+                                        ...streetStartPoints(
+                                            graph.points,
+                                            otherPointIndex,
+                                            otherToConnectionIndex,
+                                            otherConnections
+                                        ),
+                                    ])
+                                    const geometry = new ShapeGeometry(shape)
+                                    swapYZ(geometry)
+                                    invertWinding(geometry)
+                                    return geometry
+                                })
+                                .filter(filterNull)
+                        )
+                    }
+                    return prev
+                }, [])
+            )
     )
+    delete g.attributes.uv
+    const x = mergeVertices(g.toNonIndexed(), 0.1)
+    console.log(g, x)
+    return x
 }
 
-const globalToLocal = new Matrix4()
+function streetStartPoints(
+    points: Array<Vector3>,
+    fromPointIndex: number,
+    toConnectionIndex: number,
+    connections: Array<number>
+): Array<Vector2> {
+    fromV3(points[fromPointIndex], centerHelper)
+    const otherPointIndex = connections[toConnectionIndex]
 
-export const XAXIS = new Vector3(1, 0, 0)
-export const YAXIS = new Vector3(0, 1, 0)
-export const ZAXIS = new Vector3(0, 0, 1)
+    if (connections.length < 2) {
+        return [
+            createStreetCorner(centerHelper, 10, fromV3(points[otherPointIndex], fromHelper), true),
+            createStreetCorner(centerHelper, 10, fromV3(points[otherPointIndex], fromHelper), false),
+        ]
+    }
+
+    const prevOtherPointIndex = connections[(toConnectionIndex - 1 + connections.length) % connections.length]
+    const nextOtherPointIndex = connections[(toConnectionIndex + 1) % connections.length]
+    return [
+        computeStreetBoundaryIntersection(
+            centerHelper,
+            10,
+            fromV3(points[prevOtherPointIndex], toHelper),
+            10,
+            fromV3(points[otherPointIndex], fromHelper),
+            10,
+            new Vector2()
+        ),
+        computeStreetBoundaryIntersection(
+            centerHelper,
+            10,
+            fromV3(points[otherPointIndex], fromHelper),
+            10,
+            fromV3(points[nextOtherPointIndex], toHelper),
+            10,
+            new Vector2()
+        ),
+    ]
+}
+
+/*
+const tangentHelper = new Vector2()
+const helper2d = new Vector2()
+
+export function generateStreet(p1: Vector2, s1: number, p2: Vector2, s2: number): Shape {
+    tangentHelper.copy(p1).sub(p2)
+
+    const x = new Vector2()
+    calculateIntersection(new Vector2(0, 0), new Vector2(0, 0.5), new Vector2(1, 1), new Vector2(-0.5, 1), x)
+
+    //rotate right
+    const tmp = tangentHelper.x
+    tangentHelper.x = -tangentHelper.y
+    tangentHelper.y = tmp
+    tangentHelper.normalize()
+
+    const shape = new Shape()
+
+    helper2d.copy(tangentHelper).multiplyScalar(s1).add(p1)
+    shape.moveTo(helper2d.x, helper2d.y)
+
+    helper2d.copy(tangentHelper).multiplyScalar(s1).negate().add(p1)
+    shape.lineTo(helper2d.x, helper2d.y)
+
+    helper2d.copy(tangentHelper).multiplyScalar(s1).negate().add(p2)
+    shape.lineTo(helper2d.x, helper2d.y)
+
+    helper2d.copy(tangentHelper).multiplyScalar(s1).add(p2)
+    shape.lineTo(helper2d.x, helper2d.y)
+
+    return shape
+}*/
+
+const p1 = new Vector2()
+const p2 = new Vector2()
+const p3 = new Vector2()
+const p4 = new Vector2()
+
+function computeStreetBoundaryIntersection(
+    centerPoint: Vector2,
+    centerSize: number,
+    fromPoint: Vector2,
+    fromSize: number,
+    toPoint: Vector2,
+    toSize: number,
+    target: Vector2
+): Vector2 {
+    calculateStreetBoundary(centerPoint, centerSize, fromPoint, fromSize, false, p1, p2)
+    calculateStreetBoundary(centerPoint, centerSize, toPoint, toSize, true, p3, p4)
+    if (!calculateIntersection(p1, p2, p3, p4, target)) {
+        target.copy(p1)
+    }
+    return target
+}
+
+const tangentHelper = new Vector2()
+
+function createStreetCorner(p1: Vector2, size: number, p2: Vector2, left: boolean, target = new Vector2()): Vector2 {
+    target.copy(p1).sub(p2)
+
+    const tmp = target.x
+    target.x = -target.y
+    target.y = tmp
+    target.normalize()
+
+    if (left) {
+        target.negate()
+    }
+
+    return target.multiplyScalar(size / 2).add(p1)
+}
+
+function calculateStreetBoundary(
+    p1: Vector2,
+    s1: number,
+    p2: Vector2,
+    s2: number,
+    left: boolean,
+    target1: Vector2,
+    target2: Vector2
+): void {
+    tangentHelper.copy(p1).sub(p2)
+
+    const tmp = tangentHelper.x
+    tangentHelper.x = -tangentHelper.y
+    tangentHelper.y = tmp
+    tangentHelper.normalize()
+
+    if (left) {
+        tangentHelper.negate()
+    }
+
+    target1
+        .copy(tangentHelper)
+        .multiplyScalar(s1 / 2)
+        .add(p1)
+
+    target2
+        .copy(tangentHelper)
+        .multiplyScalar(s2 / 2)
+        .add(p2)
+}
+
+function calculateIntersection(p1: Vector2, p2: Vector2, p3: Vector2, p4: Vector2, target: Vector2): boolean {
+    const c2x = p3.x - p4.x // (x3 - x4)
+    const c3x = p1.x - p2.x // (x1 - x2)
+    const c2y = p3.y - p4.y // (y3 - y4)
+    const c3y = p1.y - p2.y // (y1 - y2)
+
+    // down part of intersection point formula
+    const d = c3x * c2y - c3y * c2x
+
+    if (d == 0) {
+        return false
+    }
+
+    // upper part of intersection point formula
+    const u1 = p1.x * p2.y - p1.y * p2.x // (x1 * y2 - y1 * x2)
+    const u4 = p3.x * p4.y - p3.y * p4.x // (x3 * y4 - y3 * x4)
+
+    // intersection point formula
+
+    target.x = (u1 * c2x - c3x * u4) / d
+    target.y = (u1 * c2y - c3y * u4) / d
+
+    return true
+}
+/*
 
 export function generateFaces(
     graph: Graph,
@@ -228,7 +447,11 @@ function drawTriangle(
     }
     shape.lineTo(v2.x, v2.z)
     shape.lineTo(v3.x, v3.z)
-}
+}*/
+
+const v1 = new Vector3()
+const v2 = new Vector3()
+const v3 = new Vector3()
 
 function degreeBetween(targetPoint: Vector3, p1: Vector3, p2: Vector3, normal: Vector3): number {
     v1.copy(p1).sub(targetPoint)

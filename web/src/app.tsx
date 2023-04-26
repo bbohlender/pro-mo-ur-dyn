@@ -1,11 +1,11 @@
 import { Canvas } from "@react-three/fiber"
-import { ContactShadows, Environment, OrbitControls, Plane, Sky } from "@react-three/drei"
+import { OrbitControls } from "@react-three/drei"
 import { Interface2D } from "./components/interface-2d.js"
 import { Agents } from "./components/viewer/agents.js"
 import { useInterpreterResult } from "./state/interpreter.js"
 import { Buildings } from "./components/viewer/buildings.js"
-import { Suspense } from "react"
 import { Pathways } from "./components/viewer/pathways.js"
+import { ContactShadows } from "./components/contact-shadow.js"
 
 export default function App() {
     useInterpreterResult()
@@ -23,17 +23,17 @@ export default function App() {
                 <Pathways />
                 <OrbitControls />
                 <ContactShadows
-                    rotation={[0, 0, 0]}
                     position={[0, -0.2, 0]}
+                    rotation={[-Math.PI / 2, 0, 0]}
                     opacity={0.4}
                     width={50}
                     height={50}
                     blur={0.5}
                     far={100}
                 />
-                <Suspense fallback={null}>
+                {/*<Suspense fallback={null}>
                     <Environment preset="city" />
-                </Suspense>
+    </Suspense>*/}
             </Canvas>
             <Interface2D />
         </>
