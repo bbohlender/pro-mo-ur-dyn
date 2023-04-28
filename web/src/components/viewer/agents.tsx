@@ -25,6 +25,7 @@ import {
 import { useStore } from "../../state/store.js"
 import { useModel } from "./use-model.js"
 import { useTexture } from "@react-three/drei"
+import shallowEqual from "zustand/shallow"
 
 const helperMatrix = new Matrix4()
 const translateHelper = new Vector3()
@@ -33,7 +34,27 @@ const rotationHelper = new Quaternion()
 
 const MaxAgentCount = 100
 
-export function Agents({ url }: { url: string }) {
+export function Agents() {
+    const agentUrls = useStore(
+        (state) =>
+            Array.from(
+                (state.result.agents as Array<MotionEntity> | undefined)?.reduce((prev, entity) => {
+                    prev.add(entity.url)
+                    return prev
+                }, new Set<string>()) ?? []
+            ),
+        shallowEqual as any
+    )
+    return (
+        <>
+            {agentUrls.map((url) => (
+                <AgentType key={url} url={url} />
+            ))}
+        </>
+    )
+}
+
+export function AgentType({ url }: { url: string }) {
     const ref1 = useRef<InstancedMesh>(null)
     const ref2 = useRef<InstancedMesh>(null)
     const { entitiyGeometry, entityMaterial, planeGeometry } = useModel(`${url}.glb`)
@@ -61,13 +82,16 @@ export function Agents({ url }: { url: string }) {
         ref1.current.count = 0
         ref2.current.count = 0
         for (const value of agents ?? []) {
+            if (value.url != url) {
+                continue
+            }
             const index = getKeyframeIndex(value.keyframes, state.time, 0)
             if (index == null) {
                 continue
             }
             getEntityPositionAt(value.keyframes, state.time, index, translateHelper)
             getEntityRotationAt(value.keyframes, state.time, index, rotationHelper)
-            translateHelper.y += 0.05
+            translateHelper.y += 0.15
             helperMatrix.compose(translateHelper, rotationHelper, scaleHelper.setScalar(2.5))
             ref1.current.setMatrixAt(ref1.current.count, helperMatrix)
             ref2.current.setMatrixAt(ref1.current.count, helperMatrix)
@@ -105,7 +129,7 @@ export function Paths() {
             for (let i = 1; i < value.keyframes.length; i++) {
                 const p1 = value.keyframes[i - 1]
                 const p2 = value.keyframes[i]
-                points.push(new Vector3(p1.x, p1.y + 0.05, p1.z), new Vector3(p2.x, p2.y + 0.05, p2.z))
+                points.push(new Vector3(p1.x, p1.y + 0.1, p1.z), new Vector3(p2.x, p2.y + 0.05, p2.z))
             }
 
             group.add(new LineSegments(new BufferGeometry().setFromPoints(points), lineMaterial))

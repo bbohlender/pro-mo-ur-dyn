@@ -7,14 +7,25 @@ import { sampleGeometry } from "../sample.js"
 import { findPathTo } from "./pathfinding.js"
 
 const TIME_STEP = 0.1 //ms
-const RADIUS = 0.1 //meter
 
 export const entityTypeDefaults = {
-    pedestrian: {},
-    car: {},
-    bus: {},
-    train: {},
-    cyclist: {}
+    pedestrian: {
+        url: "models/human",
+        radius: 0.5,
+    },
+    car: {
+        url: "models/car",
+        radius: 2.5,
+    },
+    bus: {
+        url: "models/bus",
+        radius: 5,
+    },
+    train: {
+        url: "models/train",
+        radius: 8,
+    },
+    //cyclist: {},
 }
 
 const positionHelper = new Vector3()
@@ -113,7 +124,8 @@ export const operations: Operations = {
                             t: entity.keyframes[entity.keyframes.length - 1].t,
                         },
                     ],
-                    type: entity.type,
+                    radius: entity.radius,
+                    url: entity.url,
                 }))
             )
         },
@@ -185,7 +197,7 @@ export const operations: Operations = {
             if (
                 !isColliding(
                     queue.list.map(({ value: { raw } }) => raw).concat(queue.results.map(({ raw }) => raw)),
-                    entity.type,
+                    entity.radius,
                     positionHelper.set(newX, newY, newZ),
                     nextT
                 )
@@ -212,7 +224,7 @@ export const operations: Operations = {
 
 const targetEntityPositionHelper = new Vector3()
 
-function isColliding(environment: Array<any>, type: MotionEntityType, position: Vector3, time: number) {
+function isColliding(environment: Array<any>, radius: number, position: Vector3, time: number) {
     for (const value of environment) {
         if (isMotionEntity(value)) {
             const index = getKeyframeIndex(value.keyframes, time, TIME_STEP + 0.001)
@@ -221,7 +233,7 @@ function isColliding(environment: Array<any>, type: MotionEntityType, position: 
             }
             getEntityPositionAt(value.keyframes, time, index, targetEntityPositionHelper)
             const distance = position.distanceTo(targetEntityPositionHelper)
-            if (distance < 1) {
+            if (distance < value.radius + radius) {
                 return true
             }
         }
@@ -236,9 +248,14 @@ export function compareMotionEntityPriority(e1: MotionEntity, e2: MotionEntity) 
 }
 
 export function createMotionEntitiy({ type, x, y, z, time }: any, astId: string): MotionEntity {
+    const defaults = entityTypeDefaults[(type ?? "pedestrian") as keyof typeof entityTypeDefaults]
+    if (defaults == null) {
+        throw new Error(`unknown type "${type}"`)
+    }
     return {
-        type: motionEntityTypeMap[type as keyof typeof motionEntityTypeMap] ?? MotionEntityType.Pedestrian,
         keyframes: [{ x: x ?? 0, y: y ?? 0, z: z ?? 0, t: time ?? 0, astId }],
+        radius: defaults.radius,
+        url: defaults.url,
     }
 }
 
@@ -259,8 +276,9 @@ const motionEntityTypeMap = {
 }
 
 export type MotionEntity = {
-    type: MotionEntityType
     keyframes: Array<Keyframe>
+    url: string
+    radius: number
 }
 
 export type Keyframe = {
@@ -269,6 +287,7 @@ export type Keyframe = {
     z: number
     t: number
     astId: string
+    //speed: number
 }
 
 export function isMotionEntity(value: unknown): value is MotionEntity {

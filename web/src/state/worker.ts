@@ -53,10 +53,9 @@ initializeWorker({
                     type: variables.type,
                 } satisfies Pathway
 
-            case "pedestrian":
+            default:
                 return createMotionEntitiy(variables, astId)
         }
-        throw new Error(`unknown type "${variables.type}"`)
     },
     getComputeProgress(value) {
         if (isMotionEntity(value)) {

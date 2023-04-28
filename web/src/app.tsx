@@ -19,10 +19,10 @@ export default function App() {
                 <ambientLight intensity={0.5} />
                 <directionalLight intensity={0.5} position={[1, 1, 1]} />
                 <Suspense>
-                    <Agents url="models/car" />
+                    <Agents />
                 </Suspense>
                 <GeometryResult color="white" type="building" />
-                <GeometryResult position-y={0.1} color="white" type="footwalk" />
+                <GeometryResult position-y={0.05} color="white" type="footwalk" />
                 <GeometryResult color="gray" type="street" />
                 <OrbitControls />
                 <ContactShadows
