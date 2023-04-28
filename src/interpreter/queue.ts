@@ -17,7 +17,14 @@ export class Queue {
 
     public readonly results: Array<Value> = []
 
-    public readonly resultCache: { [Key in string]: any } = {}
+    private readonly resultCache: { [Key in string]: any } = {}
+
+    public getCached<T>(key: string, fn: (results: Array<Value>) => T): T {
+        if (key in this.resultCache) {
+            return this.resultCache[key]
+        }
+        return (this.resultCache[key] = fn(this.results))
+    }
 
     /**
      *

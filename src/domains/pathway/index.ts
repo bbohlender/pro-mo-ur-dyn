@@ -1,19 +1,11 @@
 import { BufferGeometry } from "three"
 import { Operations } from "../../index.js"
 import { createGraph, expandGraph } from "./graph.js"
-import { Queue } from "../../interpreter/queue.js"
 
-export type Pathway = { points: Array<{ x: number; y: number; size: number; astId: string }> }
+export type Pathway = { points: Array<{ x: number; y: number; size: number; astId: string }>; type: string }
 
-export function getPathwaysGeometry(queue: Queue): BufferGeometry | null {
-    if (queue.resultCache.pathways !== undefined) {
-        return queue.resultCache.pathways
-    }
-    return (queue.resultCache.pathways = pathwaysToGeometry(queue.results.map(({ raw }) => raw).filter(isPathway)))
-}
-
-export function pathwaysToGeometry(pathways: Array<Pathway>): BufferGeometry | null {
-    const graph = createGraph(pathways)
+export function pathwaysToGeometry(pathways: Array<Pathway>, type: string): BufferGeometry | null {
+    const graph = createGraph(pathways, type)
     return expandGraph(graph)
 }
 
@@ -24,19 +16,20 @@ export function isPathway(value: any): value is Pathway {
 export const operations: Operations = {
     pathwayFrom: {
         defaultParameters: [],
-        includeThis: false,
+        includeThis: true,
         includeQueue: false,
-        execute: (next, astId, x: number, y: number, size = 3) => {
+        execute: (next, astId, pathway: Pathway, x: number, y: number, size: number) => {
             return next({
                 points: [{ x, y, size, astId }],
-            })
+                type: pathway.type,
+            } satisfies Pathway)
         },
     },
     pathwayTo: {
         defaultParameters: [],
         includeThis: true,
         includeQueue: false,
-        execute: (next, astId, value: Pathway, x: number, y: number, size = 3) => {
+        execute: (next, astId, value: Pathway, x: number, y: number, size: number) => {
             value.points.push({ x, y, size, astId })
             return next(value)
         },

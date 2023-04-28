@@ -41,17 +41,22 @@ initializeWorker({
     },
     computeDurationMS: 1000,
     createValue(variables, astId) {
-        if (variables.type === "building") {
-            return new PointPrimitive(
-                makeTranslationMatrix(variables.x ?? 0, variables.y ?? 0, variables.z ?? 0, new Matrix4())
-            )
+        switch (variables.type ?? "pedestrian") {
+            case "building":
+                return new PointPrimitive(
+                    makeTranslationMatrix(variables.x ?? 0, variables.y ?? 0, variables.z ?? 0, new Matrix4())
+                )
+            case "footwalk":
+            case "street":
+                return {
+                    points: [{ x: variables.x ?? 0, y: variables.y ?? 0, size: variables.size ?? 0, astId }],
+                    type: variables.type,
+                } satisfies Pathway
+
+            case "pedestrian":
+                return createMotionEntitiy(variables, astId)
         }
-        if (variables.type === "pathway") {
-            return {
-                points: [{ x: variables.x ?? 0, y: variables.y ?? 0, size: variables.size ?? 0, astId }],
-            } satisfies Pathway
-        }
-        return createMotionEntitiy(variables, astId)
+        throw new Error(`unknown type "${variables.type}"`)
     },
     getComputeProgress(value) {
         if (isMotionEntity(value)) {
@@ -73,8 +78,21 @@ initializeWorker({
     serialize(queue, prevProgress, currentProgress) {
         const all = queue.list.map(({ value: { raw } }) => raw).concat(queue.results.map(({ raw }) => raw))
         return {
-            buildings: (queue.resultCache.buildings ?? primitivesToGeometry(all.filter(isPrimitive)))?.toJSON(),
-            pathways: (queue.resultCache.pathways ?? pathwaysToGeometry(all.filter(isPathway)))?.toJSON(),
+            building: queue
+                .getCached("building", (results) =>
+                    primitivesToGeometry(results.map(({ raw }) => raw).filter(isPrimitive))
+                )
+                ?.toJSON(),
+            street: queue
+                .getCached("street", (results) =>
+                    pathwaysToGeometry(results.map(({ raw }) => raw).filter(isPathway), "street")
+                )
+                ?.toJSON(),
+            footwalk: queue
+                .getCached("footwalk", (results) =>
+                    pathwaysToGeometry(results.map(({ raw }) => raw).filter(isPathway), "footwalk")
+                )
+                ?.toJSON(),
             agents: all.filter(isMotionEntity),
         }
         /*return values.map((value) => {

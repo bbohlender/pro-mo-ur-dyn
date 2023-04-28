@@ -1,13 +1,21 @@
 import { Vector3 } from "three"
 import { InterpreterOptions, OperationNextCallback, Operations } from "../../interpreter/index.js"
-import { getEntityPositionAt } from "./helper.js"
-import { getPathwaysGeometry, isPathway } from "../pathway/index.js"
+import { getEntityPositionAt, getKeyframeIndex } from "./helper.js"
+import { isPathway, pathwaysToGeometry } from "../pathway/index.js"
 import { Queue } from "../../interpreter/queue.js"
 import { sampleGeometry } from "../sample.js"
 import { findPathTo } from "./pathfinding.js"
 
 const TIME_STEP = 0.1 //ms
 const RADIUS = 0.1 //meter
+
+export const entityTypeDefaults = {
+    pedestrian: {},
+    car: {},
+    bus: {},
+    train: {},
+    cyclist: {}
+}
 
 const positionHelper = new Vector3()
 
@@ -47,29 +55,32 @@ export const operations: Operations = {
         },
         includeThis: true,
     },
-    randomPointOnPathway: {
+    randomPointOn: {
         defaultParameters: [],
-        execute: (next, astId, queue: Queue) => {
-            const pathwayGeometry = getPathwaysGeometry(queue)
-            if (pathwayGeometry == null) {
+        execute: (next, astId, queue: Queue, type: string) => {
+            const geometry = queue.getCached(type, (results) =>
+                pathwaysToGeometry(results.map(({ raw }) => raw).filter(isPathway), type)
+            )
+            if (geometry == null) {
                 return next(null)
             }
-            const [{ x, y, z }] = sampleGeometry(pathwayGeometry, 1)
+            const [{ x, y, z }] = sampleGeometry(geometry, 1)
             return next({ x, y, z })
         },
         includeQueue: true,
         includeThis: false,
     },
-    pathTo: {
+    pathOnTo: {
         defaultParameters: [],
         execute: (
             next,
             astId,
             entity: MotionEntity,
             queue: Queue,
+            type: string,
             { x, y, z }: { x: number; y: number; z: number }
         ) => {
-            const path = findPathTo(queue, entity.keyframes[entity.keyframes.length - 1], x, y, z)
+            const path = findPathTo(queue, type, entity.keyframes[entity.keyframes.length - 1], x, y, z)
             if (path != null) {
                 let t = entity.keyframes[entity.keyframes.length - 1].t
                 for (const { x, y, z } of path) {
@@ -82,10 +93,12 @@ export const operations: Operations = {
         includeQueue: true,
         includeThis: true,
     },
-    spawnOnPathway: {
+    spawnOn: {
         defaultParameters: [],
-        execute: (next, astId, entity: MotionEntity, queue: Queue, amount = 1) => {
-            const pathwayGeometry = getPathwaysGeometry(queue)
+        execute: (next, astId, entity: MotionEntity, queue: Queue, type = "street", amount = 1) => {
+            const pathwayGeometry = queue.getCached(type, (results) =>
+                pathwaysToGeometry(results.map(({ raw }) => raw).filter(isPathway), type)
+            )
             if (pathwayGeometry == null) {
                 return next([])
             }
@@ -202,9 +215,11 @@ const targetEntityPositionHelper = new Vector3()
 function isColliding(environment: Array<any>, type: MotionEntityType, position: Vector3, time: number) {
     for (const value of environment) {
         if (isMotionEntity(value)) {
-            if (!getEntityPositionAt(value.keyframes, time, targetEntityPositionHelper, TIME_STEP + 0.001)) {
+            const index = getKeyframeIndex(value.keyframes, time, TIME_STEP + 0.001)
+            if (index == null) {
                 continue
             }
+            getEntityPositionAt(value.keyframes, time, index, targetEntityPositionHelper)
             const distance = position.distanceTo(targetEntityPositionHelper)
             if (distance < 1) {
                 return true

@@ -1,6 +1,5 @@
-import { Vector3, Matrix4, Shape, ShapeGeometry, BufferGeometry, Vector2, Line, Line3 } from "three"
+import { Vector3, Shape, ShapeGeometry, BufferGeometry, Vector2 } from "three"
 import { filterNull } from "../../util.js"
-import { makeTranslationMatrix } from "../building/math.js"
 import { invertWinding, swapYZ } from "../building/primitive.js"
 import { Pathway } from "./index.js"
 import { mergeBufferGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js"
@@ -21,16 +20,18 @@ function addConnectionToGraph(connectionsList: Array<Array<number>>, i1: number,
 
 const YUP = new Vector3(0, 1, 0)
 
-export function createGraph(pathways: Array<Pathway>, normal: Vector3 = YUP, threshold = 10): Graph {
-    const thresholdSquared = threshold * threshold
-    const points: Array<Vector3> = []
+export function createGraph(pathways: Array<Pathway>, type: string, normal: Vector3 = YUP, threshold = 3): Graph {
+    const points: Array<{ position: Vector3; size: number }> = []
     const connectionsList: Array<Array<number>> = []
     for (const pathway of pathways) {
+        if(pathway.type != type) {
+            continue
+        }
         const p1 = new Vector3(pathway.points[0].x, 0, pathway.points[0].y)
-        let prevIndex = getIndexInPoints(points, p1, thresholdSquared)
+        let prevIndex = getIndexInPoints(points, p1, pathway.points[0].size)
         for (let i = 1; i < pathway.points.length; i++) {
             const p2 = new Vector3(pathway.points[i].x, 0, pathway.points[i].y)
-            const currentIndex = getIndexInPoints(points, p2, thresholdSquared)
+            const currentIndex = getIndexInPoints(points, p2, pathway.points[i].size)
             addConnectionToGraph(connectionsList, prevIndex, currentIndex)
             addConnectionToGraph(connectionsList, currentIndex, prevIndex)
             prevIndex = currentIndex
@@ -42,7 +43,12 @@ export function createGraph(pathways: Array<Pathway>, normal: Vector3 = YUP, thr
             .slice(1)
             .map((index) => ({
                 index,
-                angle: degreeBetween(points[i], points[connections[0]], points[index], normal),
+                angle: degreeBetween(
+                    points[i].position,
+                    points[connections[0]].position,
+                    points[index].position,
+                    normal
+                ),
             }))
             .sort((e1, e2) => e1.angle - e2.angle)
         connectionsList[i] = [connections[0], ...sortedAngles.map(({ index }) => index)]
@@ -53,17 +59,17 @@ export function createGraph(pathways: Array<Pathway>, normal: Vector3 = YUP, thr
     }
 }
 
-function getIndexInPoints(points: Array<Vector3>, point: Vector3, thresholdSquared: number) {
-    let index = points.findIndex((p) => vectorHelper.copy(p).sub(point).lengthSq() < thresholdSquared)
+function getIndexInPoints(points: Array<{ position: Vector3; size: number }>, position: Vector3, size: number) {
+    let index = points.findIndex((p) => vectorHelper.copy(p.position).sub(position).length() * 2 < p.size + size)
     if (index === -1) {
         index = points.length
-        points.push(point)
+        points.push({ position, size })
     }
     return index
 }
 
 type Graph = {
-    points: Array<Vector3>
+    points: Array<{ position: Vector3; size: number }>
     connectionsList: Array<Array<number> | undefined>
 }
 
@@ -74,8 +80,6 @@ function fromV3({ x, z }: Vector3, to: Vector2): Vector2 {
 const centerHelper = new Vector2()
 const fromHelper = new Vector2()
 const toHelper = new Vector2()
-
-const empty = new Vector2()
 
 export function expandGraph(graph: Graph, normal: Vector3 = YUP): BufferGeometry | null {
     if (graph.points.length === 0) {
@@ -88,19 +92,22 @@ export function expandGraph(graph: Graph, normal: Vector3 = YUP): BufferGeometry
                 if (otherPointIndicies == null || otherPointIndicies.length < 3) {
                     return undefined
                 }
-                fromV3(graph.points[pointIndex], centerHelper)
+                const center = graph.points[pointIndex]
+                fromV3(center.position, centerHelper)
                 const shape = new Shape(
                     otherPointIndicies
                         .map((otherPointIndex, i) => {
                             const result = new Vector2()
                             const nextPointIndex = otherPointIndicies[(i + 1) % otherPointIndicies.length]
+                            const from = graph.points[otherPointIndex]
+                            const to = graph.points[nextPointIndex]
                             return computeStreetBoundaryIntersection(
                                 centerHelper,
-                                10,
-                                fromV3(graph.points[otherPointIndex], fromHelper),
-                                10,
-                                fromV3(graph.points[nextPointIndex], toHelper),
-                                10,
+                                center.size,
+                                fromV3(from.position, fromHelper),
+                                from.size,
+                                fromV3(to.position, toHelper),
+                                to.size,
                                 result
                             )
                         })
@@ -150,46 +157,50 @@ export function expandGraph(graph: Graph, normal: Vector3 = YUP): BufferGeometry
             )
     )
     delete g.attributes.uv
-    const x = mergeVertices(g.toNonIndexed(), 0.1)
-    console.log(g, x)
-    return x
+    return mergeVertices(g.toNonIndexed(), 0.1)
 }
 
 function streetStartPoints(
-    points: Array<Vector3>,
+    points: Array<{ position: Vector3; size: number }>,
     fromPointIndex: number,
     toConnectionIndex: number,
     connections: Array<number>
 ): Array<Vector2> {
-    fromV3(points[fromPointIndex], centerHelper)
+    const center = points[fromPointIndex]
+    fromV3(center.position, centerHelper)
     const otherPointIndex = connections[toConnectionIndex]
+    const otherPoint = points[otherPointIndex]
 
     if (connections.length < 2) {
         return [
-            createStreetCorner(centerHelper, 10, fromV3(points[otherPointIndex], fromHelper), true),
-            createStreetCorner(centerHelper, 10, fromV3(points[otherPointIndex], fromHelper), false),
+            createStreetCorner(centerHelper, center.size, fromV3(otherPoint.position, fromHelper), true),
+            createStreetCorner(centerHelper, center.size, fromV3(otherPoint.position, fromHelper), false),
         ]
     }
 
     const prevOtherPointIndex = connections[(toConnectionIndex - 1 + connections.length) % connections.length]
     const nextOtherPointIndex = connections[(toConnectionIndex + 1) % connections.length]
+
+    const prevOtherPoint = points[prevOtherPointIndex]
+    const nextOtherPoint = points[nextOtherPointIndex]
+
     return [
         computeStreetBoundaryIntersection(
             centerHelper,
-            10,
-            fromV3(points[prevOtherPointIndex], toHelper),
-            10,
-            fromV3(points[otherPointIndex], fromHelper),
-            10,
+            center.size,
+            fromV3(prevOtherPoint.position, toHelper),
+            prevOtherPoint.size,
+            fromV3(otherPoint.position, fromHelper),
+            otherPoint.size,
             new Vector2()
         ),
         computeStreetBoundaryIntersection(
             centerHelper,
-            10,
-            fromV3(points[otherPointIndex], fromHelper),
-            10,
-            fromV3(points[nextOtherPointIndex], toHelper),
-            10,
+            center.size,
+            fromV3(otherPoint.position, fromHelper),
+            otherPoint.size,
+            fromV3(nextOtherPoint.position, toHelper),
+            nextOtherPoint.size,
             new Vector2()
         ),
     ]

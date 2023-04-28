@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import {
     BackSide,
     BoxGeometry,
@@ -10,15 +10,21 @@ import {
     LineBasicMaterial,
     LineSegments,
     Matrix4,
+    MeshBasicMaterial,
     MeshPhongMaterial,
     Quaternion,
     Vector3,
 } from "three"
-import { MotionEntity, getEntityPositionAt, isMotionEntity } from "pro-3d-video/motion"
+import {
+    MotionEntity,
+    getEntityPositionAt,
+    getEntityRotationAt,
+    getKeyframeIndex,
+    isMotionEntity,
+} from "pro-3d-video/motion"
 import { useStore } from "../../state/store.js"
-
-const geometry = new BoxGeometry()
-const meshMaterial = new MeshPhongMaterial({ toneMapped: false, color: "white" })
+import { useModel } from "./use-model.js"
+import { useTexture } from "@react-three/drei"
 
 const helperMatrix = new Matrix4()
 const translateHelper = new Vector3()
@@ -27,10 +33,17 @@ const rotationHelper = new Quaternion()
 
 const MaxAgentCount = 100
 
-export function Agents() {
-    const ref = useRef<InstancedMesh>(null)
+export function Agents({ url }: { url: string }) {
+    const ref1 = useRef<InstancedMesh>(null)
+    const ref2 = useRef<InstancedMesh>(null)
+    const { entitiyGeometry, entityMaterial, planeGeometry } = useModel(`${url}.glb`)
+    const planeTexture = useTexture(`${url}-bg.png`)
+    const planeMaterial = useMemo(
+        () => new MeshBasicMaterial({ transparent: true, map: planeTexture, toneMapped: false }),
+        [planeTexture]
+    )
     useFrame((_, delta) => {
-        if (ref.current == null) {
+        if (ref1.current == null || ref2.current == null) {
             return
         }
 
@@ -45,25 +58,32 @@ export function Agents() {
             state.time = duration === 0 ? 0 : (state.time + delta) % duration
         }
 
-        ref.current.count = 0
+        ref1.current.count = 0
+        ref2.current.count = 0
         for (const value of agents ?? []) {
-            const isPresent = getEntityPositionAt(value.keyframes, state.time, translateHelper)
-            if (!isPresent) {
+            const index = getKeyframeIndex(value.keyframes, state.time, 0)
+            if (index == null) {
                 continue
             }
+            getEntityPositionAt(value.keyframes, state.time, index, translateHelper)
+            getEntityRotationAt(value.keyframes, state.time, index, rotationHelper)
             translateHelper.y += 0.05
-            helperMatrix.compose(translateHelper, rotationHelper.identity(), scaleHelper.setScalar(0.1))
-            ref.current.setMatrixAt(ref.current.count, helperMatrix)
-            ref.current.count++
-            if (ref.current.count === MaxAgentCount) {
+            helperMatrix.compose(translateHelper, rotationHelper, scaleHelper.setScalar(2.5))
+            ref1.current.setMatrixAt(ref1.current.count, helperMatrix)
+            ref2.current.setMatrixAt(ref1.current.count, helperMatrix)
+            ref1.current.count++
+            ref2.current.count++
+            if (ref1.current.count === MaxAgentCount) {
                 break
             }
         }
-        ref.current.instanceMatrix.needsUpdate = true
+        ref1.current.instanceMatrix.needsUpdate = true
+        ref2.current.instanceMatrix.needsUpdate = true
     })
     return (
         <>
-            <instancedMesh frustumCulled={false} args={[geometry, meshMaterial, MaxAgentCount]} ref={ref} />
+            <instancedMesh frustumCulled={false} args={[entitiyGeometry, entityMaterial, MaxAgentCount]} ref={ref1} />
+            <instancedMesh frustumCulled={false} args={[planeGeometry, planeMaterial, MaxAgentCount]} ref={ref2} />
             <Paths />
         </>
     )

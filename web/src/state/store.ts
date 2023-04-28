@@ -53,7 +53,7 @@ export const useStore = createZustand(
             set({ playing: !get().playing })
         },
 
-        replaceResult({ agents = [], buildings, pathways }: any, final: boolean) {
+        replaceResult({ agents = [], building, footwalk, street }: any, final: boolean) {
             let duration = 0
 
             for (const value of agents) {
@@ -63,8 +63,9 @@ export const useStore = createZustand(
             set({
                 result: {
                     agents,
-                    buildings: buildings == null ? undefined : loader.parse(buildings),
-                    pathways: pathways == null ? undefined : loader.parse(pathways),
+                    building: building == null ? undefined : loader.parse(building),
+                    street: street == null ? undefined : loader.parse(street),
+                    footwalk: footwalk == null ? undefined : loader.parse(footwalk),
                 },
                 duration,
                 time: clamp(get().time, 0, duration),

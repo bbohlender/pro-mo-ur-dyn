@@ -60,7 +60,8 @@ async function importBuildingsPathways() {
     const layers = await loadMapLayers("_18-77198-98516.mvt", 98516, 18)
     useStore.getState().addDescriptions({
         ...convertLotsToDescriptions(layers),
-        Streets: convertPathwaysToDescription(layers),
+        Streets: convertPathwaysToDescription(layers, 10, "street", ["street", "secondary"]),
+        Footwalks: convertPathwaysToDescription(layers, 3, "footwalk", ["footwalk", "path"]),
     })
 }
 

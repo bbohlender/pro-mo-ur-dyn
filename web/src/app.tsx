@@ -3,9 +3,9 @@ import { OrbitControls } from "@react-three/drei"
 import { Interface2D } from "./components/interface-2d.js"
 import { Agents } from "./components/viewer/agents.js"
 import { useInterpreterResult } from "./state/interpreter.js"
-import { Buildings } from "./components/viewer/buildings.js"
-import { Pathways } from "./components/viewer/pathways.js"
+import { GeometryResult } from "./components/viewer/geometry-result.js"
 import { ContactShadows } from "./components/contact-shadow.js"
+import { Suspense } from "react"
 
 export default function App() {
     useInterpreterResult()
@@ -18,9 +18,12 @@ export default function App() {
                 style={{ width: "100vw", height: "100svh" }}>
                 <ambientLight intensity={0.5} />
                 <directionalLight intensity={0.5} position={[1, 1, 1]} />
-                <Agents />
-                <Buildings />
-                <Pathways />
+                <Suspense>
+                    <Agents url="models/car" />
+                </Suspense>
+                <GeometryResult color="white" type="building" />
+                <GeometryResult position-y={0.1} color="white" type="footwalk" />
+                <GeometryResult color="gray" type="street" />
                 <OrbitControls />
                 <ContactShadows
                     position={[0, -0.2, 0]}

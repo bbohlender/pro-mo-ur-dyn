@@ -56,20 +56,25 @@ export async function loadMapLayers(url: string, y: number, zoom: number, tilePi
     }, {} as Layers)
 }
 
-export function convertPathwaysToDescription(layers: Layers): NestedDescription {
+export function convertPathwaysToDescription(
+    layers: Layers,
+    size: number,
+    type: string,
+    classes: Array<string>
+): NestedDescription {
     return {
         rootNounIdentifier: "Start",
-        initialVariables: { type: "pathway" },
+        initialVariables: { type },
         nouns: {
             Start: {
                 transformation: {
                     type: "parallel",
                     children: layers["road"]
-                        .filter((feature) => feature.properties.class === "street")
+                        .filter((feature) => classes.includes(feature.properties.class))
                         .reduce<Array<NestedTransformation>>((prev, feature) => {
                             prev.push(
                                 ...feature.geometry.map<NestedTransformation>((polygon) =>
-                                    convertPolygonStreetToDescription(polygon)
+                                    convertPolygonStreetToDescription(polygon, size)
                                 )
                             )
                             return prev
@@ -153,7 +158,10 @@ function pointIsInside(x: number, y: number, minX: number, minY: number, maxX: n
     return minX <= x && minY <= y && x <= maxX && y <= maxY
 }*/
 
-function convertPolygonStreetToDescription(polygon: Layers[string][number]["geometry"][number]): NestedTransformation {
+function convertPolygonStreetToDescription(
+    polygon: Layers[string][number]["geometry"][number],
+    size: number
+): NestedTransformation {
     return {
         type: "sequential",
         children: [
@@ -168,6 +176,10 @@ function convertPolygonStreetToDescription(polygon: Layers[string][number]["geom
                     {
                         type: "raw",
                         value: polygon[0].y,
+                    },
+                    {
+                        type: "raw",
+                        value: size,
                     },
                 ],
             },
@@ -186,6 +198,10 @@ function convertPolygonStreetToDescription(polygon: Layers[string][number]["geom
                                 type: "raw",
                                 value: y,
                             },
+                            {
+                                type: "raw",
+                                value: size,
+                            },
                         ],
                     }
                 })
@@ -198,7 +214,9 @@ export function convertLotsToDescriptions(layers: Layers): NestedDescriptions {
     const descriptions: NestedDescriptions = {}
     for (let i = 0; i < layers["building"].length; i++) {
         const feature = layers["building"][i]
-        const transformations = feature.geometry.map((polygon) => convertPolygonLotToSteps(polygon)).filter(filterNull)
+        const transformations = feature.geometry
+            .map((polygon) => convertPolygonLotToTransformation(polygon))
+            .filter(filterNull)
         if (transformations.length === 0) {
             continue
         }
@@ -236,7 +254,7 @@ export function convertLotsToDescriptions(layers: Layers): NestedDescriptions {
     return descriptions
 }
 
-function convertPolygonLotToSteps(
+function convertPolygonLotToTransformation(
     geometry: Layers[string][number]["geometry"][number]
 ): NestedTransformation | undefined {
     const children = new Array<NestedTransformation>(geometry.length - 1)
