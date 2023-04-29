@@ -11,24 +11,32 @@ const TIME_STEP = 0.1 //ms
 export const entityTypeDefaults = {
     pedestrian: {
         url: "models/human",
-        radius: 0.5,
+        radius: 1,
+        speed: 1.5,
     },
     car: {
         url: "models/car",
+        speed: 17,
         radius: 2.5,
     },
     bus: {
         url: "models/bus",
-        radius: 5,
+        speed: 14,
+        radius: 3,
     },
     train: {
         url: "models/train",
-        radius: 8,
+        speed: 17,
+        radius: 3,
     },
     //cyclist: {},
 }
 
 const positionHelper = new Vector3()
+
+function distanceTo(dx: number, dy: number, dz: number) {
+    return Math.sqrt(dx * dx + dy * dy + dz * dz)
+}
 
 export const operations: Operations = {
     moveTo: {
@@ -41,11 +49,20 @@ export const operations: Operations = {
             entity: MotionEntity,
             x: number,
             y: number,
-            z: number,
-            dt: number
+            z: number
         ) => {
-            const { t } = entity.keyframes[entity.keyframes.length - 1]
-            entity.keyframes.push({ x, y, z, t: t + dt, astId })
+            const { x: currentX, y: currentY, z: currentZ, t, speed } = entity.keyframes[entity.keyframes.length - 1]
+            const dt = distanceTo(currentX - x, currentY - y, currentZ - z) / speed
+            entity.keyframes.push({ x, y, z, t: t + dt, astId, speed })
+            return next(entity)
+        },
+    },
+    speed: {
+        defaultParameters: [],
+        includeThis: true,
+        includeQueue: false,
+        execute: (next, astId, entity: MotionEntity, speed: number) => {
+            entity.keyframes[entity.keyframes.length - 1].speed = speed
             return next(entity)
         },
     },
@@ -91,13 +108,27 @@ export const operations: Operations = {
             type: string,
             { x, y, z }: { x: number; y: number; z: number }
         ) => {
-            const path = findPathTo(queue, type, entity.keyframes[entity.keyframes.length - 1], x, y, z)
+            const keyframe = entity.keyframes[entity.keyframes.length - 1]
+            const path = findPathTo(queue, type, entity.radius, keyframe, x, y, z)
             if (path != null) {
-                let t = entity.keyframes[entity.keyframes.length - 1].t
+                let { x: prevX, y: prevY, z: prevZ, t } = keyframe
                 for (const { x, y, z } of path) {
-                    t += 1
-                    entity.keyframes.push({ astId, x, y, z, t })
+                    const dt = distanceTo(prevX - x, prevY - y, prevZ - z) / keyframe.speed
+                    t += dt
+                    entity.keyframes.push({ astId, x, y, z, t, speed: keyframe.speed })
+                    prevX = x
+                    prevY = y
+                    prevZ = z
                 }
+            } else {
+                entity.keyframes.push({
+                    astId,
+                    x: keyframe.x,
+                    y: keyframe.y,
+                    z: keyframe.z,
+                    t: keyframe.t + 1,
+                    speed: keyframe.speed,
+                })
             }
             return next(entity)
         },
@@ -113,6 +144,7 @@ export const operations: Operations = {
             if (pathwayGeometry == null) {
                 return next([])
             }
+            const keyframe = entity.keyframes[entity.keyframes.length - 1]
             return next(
                 sampleGeometry(pathwayGeometry, amount).map<MotionEntity>(({ x, y, z }) => ({
                     keyframes: [
@@ -121,7 +153,8 @@ export const operations: Operations = {
                             y,
                             z,
                             astId,
-                            t: entity.keyframes[entity.keyframes.length - 1].t,
+                            t: keyframe.t,
+                            speed: keyframe.speed,
                         },
                     ],
                     radius: entity.radius,
@@ -136,13 +169,14 @@ export const operations: Operations = {
         defaultParameters: [],
         includeQueue: false,
         execute: (next, astId, entity: MotionEntity, t: number) => {
-            const { x, y, z, t: oldT } = entity.keyframes[entity.keyframes.length - 1]
+            const { x, y, z, t: oldT, speed } = entity.keyframes[entity.keyframes.length - 1]
             entity.keyframes.push({
                 astId,
                 x,
                 y,
                 z,
                 t: oldT + t,
+                speed,
             })
             return next(entity)
         },
@@ -158,11 +192,11 @@ export const operations: Operations = {
             entity: MotionEntity,
             dx: number,
             dy: number,
-            dz: number,
-            dt: number
+            dz: number
         ) => {
-            const { x, y, z, t } = entity.keyframes[entity.keyframes.length - 1]
-            entity.keyframes.push({ x: x + dx, y: y + dy, z: z + dz, t: t + dt, astId })
+            const { x, y, z, t, speed } = entity.keyframes[entity.keyframes.length - 1]
+            const dt = distanceTo(dx, dy, dz) / speed
+            entity.keyframes.push({ x: x + dx, y: y + dy, z: z + dz, t: t + dt, astId, speed })
             return next(entity)
         },
     },
@@ -177,23 +211,28 @@ export const operations: Operations = {
             queue: Queue,
             targetX: number,
             targetY: number,
-            targetZ: number,
-            dt: number
+            targetZ: number
         ) => {
-            const { x, y, z, t } = entity.keyframes[entity.keyframes.length - 1]
-            const timeStep = Math.min(dt, TIME_STEP)
-            const dx = targetX - x
-            const dy = targetY - y
-            const dz = targetZ - z
-            const stepsLeft = dt / timeStep
-            const newX = x + dx / stepsLeft
-            const newY = y + dy / stepsLeft
-            const newZ = z + dz / stepsLeft
+            const { x, y, z, t, speed } = entity.keyframes[entity.keyframes.length - 1]
+            let dx = targetX - x
+            let dy = targetY - y
+            let dz = targetZ - z
+            const fullDistanceLength = distanceTo(dx, dy, dz)
+            const stepDistance = Math.min(TIME_STEP * speed, fullDistanceLength)
+            const stepDuration = stepDistance / speed
+            //normalise and apply the step size
+            dx = (dx / fullDistanceLength) * stepDistance
+            dy = (dy / fullDistanceLength) * stepDistance
+            dz = (dz / fullDistanceLength) * stepDistance
+
+            const newX = x + dx
+            const newY = y + dy
+            const newZ = z + dz
 
             let nextX = x,
                 nextY = y,
                 nextZ = z
-            const nextT = t + timeStep
+            const nextT = t + stepDuration
             if (
                 !isColliding(
                     queue.list.map(({ value: { raw } }) => raw).concat(queue.results.map(({ raw }) => raw)),
@@ -207,15 +246,15 @@ export const operations: Operations = {
                 nextY = newY
                 nextZ = newZ
             }
-            entity.keyframes.push({ x: nextX, y: nextY, z: nextZ, t: nextT, astId })
+            entity.keyframes.push({ x: nextX, y: nextY, z: nextZ, t: nextT, astId, speed })
 
-            if (dt <= TIME_STEP) {
+            if (stepDuration <= TIME_STEP) {
                 return next(entity) //done
             }
             return next(entity, {
                 type: "precomputedOperation",
                 identifier: "moveToAndDodge",
-                parameters: [targetX, targetY, targetZ, dt - timeStep],
+                parameters: [targetX, targetY, targetZ],
                 astId,
             }) //schedule again
         },
@@ -241,19 +280,13 @@ function isColliding(environment: Array<any>, radius: number, position: Vector3,
     return false
 }
 
-export function compareMotionEntityPriority(e1: MotionEntity, e2: MotionEntity) {
-    const e1Time = e1.keyframes[e1.keyframes.length - 1].t
-    const e2Time = e2.keyframes[e2.keyframes.length - 1].t
-    return e2Time - e1Time
-}
-
 export function createMotionEntitiy({ type, x, y, z, time }: any, astId: string): MotionEntity {
     const defaults = entityTypeDefaults[(type ?? "pedestrian") as keyof typeof entityTypeDefaults]
     if (defaults == null) {
         throw new Error(`unknown type "${type}"`)
     }
     return {
-        keyframes: [{ x: x ?? 0, y: y ?? 0, z: z ?? 0, t: time ?? 0, astId }],
+        keyframes: [{ x: x ?? 0, y: y ?? 0, z: z ?? 0, t: time ?? 0, astId, speed: defaults.speed }],
         radius: defaults.radius,
         url: defaults.url,
     }
@@ -269,12 +302,6 @@ export enum MotionEntityType {
     Cyclist,
 }
 
-const motionEntityTypeMap = {
-    car: MotionEntityType.Car,
-    cylcist: MotionEntityType.Cyclist,
-    predestrian: MotionEntityType.Pedestrian,
-}
-
 export type MotionEntity = {
     keyframes: Array<Keyframe>
     url: string
@@ -287,7 +314,7 @@ export type Keyframe = {
     z: number
     t: number
     astId: string
-    //speed: number
+    speed: number
 }
 
 export function isMotionEntity(value: unknown): value is MotionEntity {
@@ -295,4 +322,3 @@ export function isMotionEntity(value: unknown): value is MotionEntity {
 }
 
 export * from "./helper.js"
-export * from "./exporter.js"

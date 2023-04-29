@@ -1,15 +1,40 @@
-import { ColorRepresentation } from "three"
+import { ColorRepresentation, KeyframeTrack, Mesh, MeshPhongMaterial, Object3D, Vector3Tuple } from "three"
 import { useStore } from "../../state/store.js"
-import { MeshProps } from "@react-three/fiber"
 
-export function GeometryResult({ type, color, ...props }: { type: string; color: ColorRepresentation } & MeshProps) {
+export function GeometryResult({
+    type,
+    color,
+    position,
+}: {
+    type: string
+    color: ColorRepresentation
+    position?: Vector3Tuple
+}) {
     const geometry = useStore((state) => state.result[type])
     if (geometry == null) {
         return null
     }
     return (
-        <mesh {...props} geometry={geometry}>
+        <mesh position={position} geometry={geometry}>
             <meshPhongMaterial toneMapped={false} color={color} />
         </mesh>
     )
+}
+
+export function exportGeometryResult(
+    objects: Array<Object3D>,
+    tracks: Array<KeyframeTrack>,
+    type: string,
+    color: ColorRepresentation,
+    position?: Vector3Tuple
+) {
+    const geometry = useStore.getState().result[type]
+    if (geometry == null) {
+        return
+    }
+    const mesh = new Mesh(geometry, new MeshPhongMaterial({ toneMapped: false, color }))
+    if (position != null) {
+        mesh.position.set(...position)
+    }
+    objects.push(mesh)
 }

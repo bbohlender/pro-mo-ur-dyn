@@ -2,13 +2,11 @@ import { Canvas } from "@react-three/fiber"
 import { OrbitControls } from "@react-three/drei"
 import { Interface2D } from "./components/interface-2d.js"
 import { Agents } from "./components/viewer/agents.js"
-import { useInterpreterResult } from "./state/interpreter.js"
 import { GeometryResult } from "./components/viewer/geometry-result.js"
 import { ContactShadows } from "./components/contact-shadow.js"
 import { Suspense } from "react"
 
 export default function App() {
-    useInterpreterResult()
     return (
         <>
             <Canvas
@@ -22,7 +20,7 @@ export default function App() {
                     <Agents />
                 </Suspense>
                 <GeometryResult color="white" type="building" />
-                <GeometryResult position-y={0.05} color="white" type="footwalk" />
+                <GeometryResult position={[0, 0.05, 0]} color="white" type="footwalk" />
                 <GeometryResult color="gray" type="street" />
                 <OrbitControls />
                 <ContactShadows

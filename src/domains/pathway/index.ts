@@ -4,9 +4,9 @@ import { createGraph, expandGraph } from "./graph.js"
 
 export type Pathway = { points: Array<{ x: number; y: number; size: number; astId: string }>; type: string }
 
-export function pathwaysToGeometry(pathways: Array<Pathway>, type: string): BufferGeometry | null {
+export function pathwaysToGeometry(pathways: Array<Pathway>, type: string, additionalSize = 0): BufferGeometry | null {
     const graph = createGraph(pathways, type)
-    return expandGraph(graph)
+    return expandGraph(graph, additionalSize)
 }
 
 export function isPathway(value: any): value is Pathway {
@@ -35,5 +35,3 @@ export const operations: Operations = {
         },
     },
 }
-
-export * from "./exporter.js"

@@ -26,18 +26,14 @@ initializeWorker({
         }
         return structuredClone(value)
     },
-    comparePriority(v1, v2) {
-        if (isMotionEntity(v1)) {
-            if (isMotionEntity(v2)) {
-                return compareMotionEntityPriority(v1, v2)
-            }
-            return -1
+    compareProgress(v1: number, v2: number) {
+        return v2 - v1
+    },
+    computeProgress(value) {
+        if (isMotionEntity(value)) {
+            return value.keyframes[value.keyframes.length - 1].t
         }
-
-        if (isMotionEntity(v2)) {
-            return 1
-        }
-        return 0
+        return -1
     },
     computeDurationMS: 1000,
     createValue(variables, astId) {
@@ -57,12 +53,6 @@ initializeWorker({
                 return createMotionEntitiy(variables, astId)
         }
     },
-    getComputeProgress(value) {
-        if (isMotionEntity(value)) {
-            return getMotionEntityProgress(value)
-        }
-        return 0
-    },
     operations: {
         ...buildingOperations,
         ...motionOperations,
@@ -70,9 +60,6 @@ initializeWorker({
     },
     shouldInterrrupt(startProgress, currentProgress) {
         return currentProgress - startProgress > 3 //3 seconds computed
-    },
-    shouldWait(requestedProgress, currentProgress) {
-        return requestedProgress <= currentProgress
     },
     serialize(queue, prevProgress, currentProgress) {
         const all = queue.list.map(({ value: { raw } }) => raw).concat(queue.results.map(({ raw }) => raw))

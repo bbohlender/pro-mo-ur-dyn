@@ -273,8 +273,8 @@ export function isPrimitive(value: any): value is Primitive {
     return value instanceof Primitive
 }
 
-export function primitivesToGeometry(primitives: Array<Primitive>): BufferGeometry | null {
-    if(primitives.length === 0) {
+export function primitivesToGeometry(primitives: Array<Primitive>): BufferGeometry | null {
+    if (primitives.length === 0) {
         return null
     }
     return mergeBufferGeometries(
@@ -284,4 +284,3 @@ export function primitivesToGeometry(primitives: Array<Primitive>): BufferGeomet
 
 export * from "./math.js"
 export * from "./primitive.js"
-export * from "./exporter.js"

@@ -53,27 +53,23 @@ export type InterpreterOptions = Readonly<{
         onBeforeTransformation?: (step: NestedTransformation, value: Value) => void
         onAfterTransformation?: (step: NestedTransformation, value: Value[]) => void
     }
-    /**
-     * compares the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
-     */
-    comparePriority: (v1: unknown, v2: unknown) => number
     createValue: (initialVariables: NestedDescription["initialVariables"], astId: string) => any
     serialize: (queue: Queue, prevProgress: any, currentProgress: any | undefined) => any
     cloneValue: (value: unknown) => unknown
     operations: Operations
     computeDurationMS: number
-    getComputeProgress(value: unknown): any
+    computeProgress(value: unknown | undefined): any
+    compareProgress(v1: unknown, v2: unknown): number
     shouldInterrrupt(startProgress: any, currentProgress: any): boolean
-    shouldWait(requestedProgress: any, currentProgress: any): boolean
 }>
 
 export function interprete(
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
     references: InterpreterReferences,
-    publishResult: (queue: Queue, prevProgress: any, currentProgress: any) => void
+    publishResult: (queue: Queue, prevProgress: any, currentProgress: any, isFinal: boolean) => void
 ): Queue {
-    const queue = new Queue(options.comparePriority)
+    const queue = new Queue(options.computeProgress, options.compareProgress)
     const descriptionsEntries = Object.entries(descriptions)
     for (let i = 0; i < descriptionsEntries.length; i++) {
         const [identifier, { initialVariables, rootNounIdentifier, nouns }] = descriptionsEntries[i]
@@ -149,7 +145,7 @@ export function interpreteQueueRecursive(
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
     references: InterpreterReferences,
-    publishResult: (queue: Queue, prevProgress: any, currentProgress: any) => void
+    publishResult: (queue: Queue, prevProgress: any, currentProgress: any, isFinal: boolean) => void
 ) {
     let nextEntry: QueueEntry | undefined = queue.peek()
     if (nextEntry == null) {
@@ -157,7 +153,7 @@ export function interpreteQueueRecursive(
     }
 
     const startTime = new Date().getTime()
-    const progressAtStart = options.getComputeProgress(nextEntry.value.raw)
+    const progressAtStart = queue.currentProgress
 
     /**
      * we interprete continously until either
@@ -168,7 +164,7 @@ export function interpreteQueueRecursive(
     while (
         nextEntry != null &&
         new Date().getTime() - startTime < options.computeDurationMS &&
-        !options.shouldInterrrupt(progressAtStart, options.getComputeProgress(nextEntry.value.raw))
+        !options.shouldInterrrupt(progressAtStart, queue.currentProgress)
     ) {
         const transformation = nextEntry.stack.shift()!
         if (transformation.type === "parallel") {
@@ -188,16 +184,9 @@ export function interpreteQueueRecursive(
         nextEntry = queue.peek()
     }
 
-    publishResult(
-        queue,
-        progressAtStart,
-        nextEntry == null ? undefined : options.getComputeProgress(nextEntry.value.raw)
-    )
+    publishResult(queue, progressAtStart, queue.currentProgress, nextEntry == null)
 
-    if (
-        nextEntry == null ||
-        options.shouldWait(references.requestedProgress, options.getComputeProgress(nextEntry.value.raw))
-    ) {
+    if (nextEntry == null || options.compareProgress(queue.currentProgress, references.requestedProgress) <= 0) {
         return
     }
 

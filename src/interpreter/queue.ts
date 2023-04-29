@@ -17,6 +17,10 @@ export class Queue {
 
     public readonly results: Array<Value> = []
 
+    private highestFinishedProgress: unknown | undefined
+
+    public currentProgress: unknown
+
     private readonly resultCache: { [Key in string]: any } = {}
 
     public getCached<T>(key: string, fn: (results: Array<Value>) => T): T {
@@ -30,7 +34,12 @@ export class Queue {
      *
      * @param compare should compare the priority between two entries; higher priority results in an faster execution. Example function: (v1, v2) => v1.prio - v2.prio (returns negative value if the order is wrong)
      */
-    constructor(private compare: (v1: unknown, v2: unknown) => number) {}
+    constructor(
+        private computeProgress: (value: unknown | undefined) => unknown,
+        private compareProgress: (v1: unknown, v2: unknown) => number
+    ) {
+        this.currentProgress = this.computeProgress(undefined)
+    }
 
     /**
      * remove the stack entry with the highest priority
@@ -50,14 +59,27 @@ export class Queue {
      * add a entry to the queue sorted by priority
      */
     push(entry: QueueEntry): void {
+        const entryProgress = this.computeProgress(entry.value.raw)
         if (entry.stack.length === 0) {
             this.results.push(entry.value)
-            return
+            if (
+                this.highestFinishedProgress == null ||
+                this.compareProgress(entryProgress, this.highestFinishedProgress) < 0
+            ) {
+                this.highestFinishedProgress = entryProgress
+            }
+        } else {
+            let i = 0
+            while (
+                i < this.list.length &&
+                this.compareProgress(entryProgress, this.computeProgress(this.list[i].value.raw)) < 0
+            ) {
+                i++
+            }
+            this.list.splice(i, 0, entry)
         }
-        let i = 0
-        while (i < this.list.length && this.compare(entry.value.raw, this.list[i].value.raw) < 0) {
-            i++
-        }
-        this.list.splice(i, 0, entry)
+
+        this.currentProgress =
+            this.list.length === 0 ? this.highestFinishedProgress : this.computeProgress(this.list[0].value.raw)
     }
 }

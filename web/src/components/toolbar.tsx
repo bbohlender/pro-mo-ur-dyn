@@ -2,9 +2,6 @@ import { useStore } from "../state/store.js"
 import { NestedDescriptions } from "pro-3d-video"
 import { Panel } from "./panel.js"
 import simplify from "simplify-js"
-import { exportGLTF as exportBuildingGLTF } from "pro-3d-video/building"
-import { exportGLTF as exportMotionGLTF } from "pro-3d-video/motion"
-import { exportGLTF as exportPathwayGLTF } from "pro-3d-video/pathway"
 import { AnimationClip, KeyframeTrack, Object3D } from "three"
 import { GLTFExporter, GLTFExporterOptions } from "three/examples/jsm/exporters/GLTFExporter.js"
 import {
@@ -13,19 +10,31 @@ import {
     loadMapLayers,
     tileMeterRatio,
 } from "../state/mapbox.js"
+import { exportGeometryResult } from "./viewer/geometry-result.js"
+import { exportMotion } from "./viewer/agents.js"
 
 export function Toolbar() {
+    const showAgentPaths = useStore((state) => state.showAgentPaths)
     return (
-        <Panel className="rounded gap-3 p-3 flex flex-row">
-            <div onClick={importAgents} className="btn btn-outline btn-sm">
+        <Panel className="rounded gap-3 p-3 flex flex-col">
+            <div onClick={importAgents} className="btn btn-outline border-slate-300 btn-sm">
                 Import Agents
             </div>
-            <div onClick={importBuildingsPathways} className="btn btn-outline btn-sm">
+            <div onClick={importBuildingsPathways} className="btn btn-outline border-slate-300 btn-sm">
                 Import Buildings & Pathways
             </div>
-            <div onClick={exportScene} className="btn btn-outline btn-sm">
+            <div onClick={exportScene} className="btn btn-outline border-slate-300 btn-sm">
                 Export
             </div>
+            <label className="label cursor-pointer">
+                <span className="label-text mr-2">Show Agent Paths</span>
+                <input
+                    onChange={(e) => useStore.getState().setShowAgentPaths(e.target.checked)}
+                    checked={showAgentPaths}
+                    type="checkbox"
+                    className="toggle toggle-primary"
+                />
+            </label>
         </Panel>
     )
 }
@@ -33,14 +42,16 @@ export function Toolbar() {
 const gltfExporter = new GLTFExporter()
 
 async function exportScene() {
-    const { result, duration } = useStore.getState()
+    const { duration } = useStore.getState()
 
     const objects: Array<Object3D> = []
     const tracks: Array<KeyframeTrack> = []
 
-    exportBuildingGLTF(result, objects, tracks)
-    exportMotionGLTF(result, objects, tracks)
-    exportPathwayGLTF(result, objects, tracks)
+    exportGeometryResult(objects, tracks, "building", "white")
+    exportGeometryResult(objects, tracks, "footwalk", "white", [0, 0.05, 0])
+    exportGeometryResult(objects, tracks, "street", "gray")
+
+    await exportMotion(objects, tracks)
 
     const root = new Object3D()
     root.add(...objects)

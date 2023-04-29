@@ -6,6 +6,8 @@ import { mergeBufferGeometries, mergeVertices } from "three/examples/jsm/utils/B
 
 const vectorHelper = new Vector3()
 
+const MinSize = 2
+
 function addConnectionToGraph(connectionsList: Array<Array<number>>, i1: number, i2: number): void {
     if (i1 === i2) {
         return
@@ -24,7 +26,7 @@ export function createGraph(pathways: Array<Pathway>, type: string, normal: Vect
     const points: Array<{ position: Vector3; size: number }> = []
     const connectionsList: Array<Array<number>> = []
     for (const pathway of pathways) {
-        if(pathway.type != type) {
+        if (pathway.type != type) {
             continue
         }
         const p1 = new Vector3(pathway.points[0].x, 0, pathway.points[0].y)
@@ -81,7 +83,7 @@ const centerHelper = new Vector2()
 const fromHelper = new Vector2()
 const toHelper = new Vector2()
 
-export function expandGraph(graph: Graph, normal: Vector3 = YUP): BufferGeometry | null {
+export function expandGraph(graph: Graph, additionalSize: number, normal: Vector3 = YUP): BufferGeometry | null {
     if (graph.points.length === 0) {
         return null
     }
@@ -103,11 +105,11 @@ export function expandGraph(graph: Graph, normal: Vector3 = YUP): BufferGeometry
                             const to = graph.points[nextPointIndex]
                             return computeStreetBoundaryIntersection(
                                 centerHelper,
-                                center.size,
+                                center.size + additionalSize,
                                 fromV3(from.position, fromHelper),
-                                from.size,
+                                from.size + additionalSize,
                                 fromV3(to.position, toHelper),
-                                to.size,
+                                to.size + additionalSize,
                                 result
                             )
                         })
@@ -136,12 +138,19 @@ export function expandGraph(graph: Graph, normal: Vector3 = YUP): BufferGeometry
                                         (pIndex) => pointIndex === pIndex
                                     )
                                     const shape = new Shape([
-                                        ...streetStartPoints(graph.points, pointIndex, toConnectionIndex, connections),
+                                        ...streetStartPoints(
+                                            graph.points,
+                                            pointIndex,
+                                            toConnectionIndex,
+                                            connections,
+                                            additionalSize
+                                        ),
                                         ...streetStartPoints(
                                             graph.points,
                                             otherPointIndex,
                                             otherToConnectionIndex,
-                                            otherConnections
+                                            otherConnections,
+                                            additionalSize
                                         ),
                                     ])
                                     const geometry = new ShapeGeometry(shape)
@@ -164,7 +173,8 @@ function streetStartPoints(
     points: Array<{ position: Vector3; size: number }>,
     fromPointIndex: number,
     toConnectionIndex: number,
-    connections: Array<number>
+    connections: Array<number>,
+    additionalSize: number
 ): Array<Vector2> {
     const center = points[fromPointIndex]
     fromV3(center.position, centerHelper)
@@ -173,8 +183,18 @@ function streetStartPoints(
 
     if (connections.length < 2) {
         return [
-            createStreetCorner(centerHelper, center.size, fromV3(otherPoint.position, fromHelper), true),
-            createStreetCorner(centerHelper, center.size, fromV3(otherPoint.position, fromHelper), false),
+            createStreetCorner(
+                centerHelper,
+                center.size + additionalSize,
+                fromV3(otherPoint.position, fromHelper),
+                true
+            ),
+            createStreetCorner(
+                centerHelper,
+                center.size + additionalSize,
+                fromV3(otherPoint.position, fromHelper),
+                false
+            ),
         ]
     }
 
@@ -187,20 +207,20 @@ function streetStartPoints(
     return [
         computeStreetBoundaryIntersection(
             centerHelper,
-            center.size,
+            center.size + additionalSize,
             fromV3(prevOtherPoint.position, toHelper),
-            prevOtherPoint.size,
+            prevOtherPoint.size + additionalSize,
             fromV3(otherPoint.position, fromHelper),
-            otherPoint.size,
+            otherPoint.size + additionalSize,
             new Vector2()
         ),
         computeStreetBoundaryIntersection(
             centerHelper,
-            center.size,
+            center.size + additionalSize,
             fromV3(otherPoint.position, fromHelper),
-            otherPoint.size,
+            otherPoint.size + additionalSize,
             fromV3(nextOtherPoint.position, toHelper),
-            nextOtherPoint.size,
+            nextOtherPoint.size + additionalSize,
             new Vector2()
         ),
     ]
@@ -253,6 +273,9 @@ function computeStreetBoundaryIntersection(
     toSize: number,
     target: Vector2
 ): Vector2 {
+    centerSize = Math.max(centerSize, MinSize)
+    fromSize = Math.max(fromSize, MinSize)
+    toSize = Math.max(toSize, MinSize)
     calculateStreetBoundary(centerPoint, centerSize, fromPoint, fromSize, false, p1, p2)
     calculateStreetBoundary(centerPoint, centerSize, toPoint, toSize, true, p3, p4)
     if (!calculateIntersection(p1, p2, p3, p4, target)) {
@@ -264,6 +287,8 @@ function computeStreetBoundaryIntersection(
 const tangentHelper = new Vector2()
 
 function createStreetCorner(p1: Vector2, size: number, p2: Vector2, left: boolean, target = new Vector2()): Vector2 {
+    size = Math.max(size, MinSize)
+
     target.copy(p1).sub(p2)
 
     const tmp = target.x

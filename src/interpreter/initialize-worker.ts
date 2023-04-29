@@ -3,16 +3,12 @@ import { InterpreterOptions, InterpreterReferences, Value, interprete, interpret
 import { Queue } from "./queue.js"
 import { WorkerMessage, WorkerMessageType } from "./worker-interface.js"
 
-function publishResult(
-    options: InterpreterOptions,
-    queue: Queue,
-    prevProgress: any,
-    currentProgress: any | undefined,
-) {
+function publishResult(options: InterpreterOptions, queue: Queue, prevProgress: any, progress: any, isFinal: boolean) {
     postMessage({
         type: WorkerMessageType.Results,
-        result: options.serialize(queue, prevProgress, currentProgress),
-        isFinal: currentProgress === undefined
+        result: options.serialize(queue, prevProgress, progress),
+        progress,
+        isFinal,
     })
 }
 
@@ -38,7 +34,7 @@ export function initializeWorker(options: InterpreterOptions): void {
                     throw new Error(`unable to update requested progress when interpretation has not yet been started`)
                 }
                 references.requestedProgress = e.data.requestedProgress
-                if (references.timeoutRef != null) {
+                if (references.timeoutRef == null) {
                     interpreteQueueRecursive(queue, descriptions, options, references, publish)
                 }
                 return
