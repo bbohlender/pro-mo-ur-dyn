@@ -5,11 +5,30 @@ import { Agents } from "./components/viewer/agents.js"
 import { GeometryResult } from "./components/viewer/geometry-result.js"
 import { ContactShadows } from "./components/contact-shadow.js"
 import { Suspense } from "react"
+import { useStore } from "./state/store.js"
+import { DragEvent } from "react"
+import { parse } from "pro-3d-video"
+
+async function onDrop(store: typeof useStore, e: DragEvent<HTMLDivElement>) {
+    e.stopPropagation()
+    e.preventDefault()
+    if (e.dataTransfer?.files.length === 1) {
+        try {
+            const text = await e.dataTransfer.files[0].text()
+            const parsed = parse(text)
+            store.getState().replaceDescriptions(parsed)
+        } catch (error: any) {
+            alert(error.message)
+        }
+    }
+}
 
 export default function App() {
     return (
         <>
             <Canvas
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={onDrop.bind(null, useStore)}
                 shadows
                 gl={{ logarithmicDepthBuffer: true, antialias: true }}
                 camera={{ far: 10000 }}

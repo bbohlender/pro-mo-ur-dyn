@@ -493,12 +493,7 @@ function interpretePrecomputedOperation<R>(
     }
     const parameters = [...transformation.parameters]
     if (operation.includeQueue) {
-        parameters.unshift(
-            queue.list
-                .slice(1)
-                .map(({ value: { raw } }) => raw)
-                .concat(queue.results.map(({ raw }) => raw))
-        )
+        parameters.unshift(queue)
     }
     if (operation.includeThis) {
         parameters.unshift(value.raw)

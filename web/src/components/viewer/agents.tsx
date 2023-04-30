@@ -64,7 +64,7 @@ export function AgentType({ url }: { url: string }) {
     const planeTexture = useTexture(`${url}-bg.png`)
     planeTexture.flipY = false
     const planeMaterial = useMemo(
-        () => new MeshBasicMaterial({ transparent: true, map: planeTexture, toneMapped: false }),
+        () => new MeshBasicMaterial({ depthWrite: false, transparent: true, map: planeTexture, toneMapped: false }),
         [planeTexture]
     )
     useFrame((_, delta) => {

@@ -5,6 +5,7 @@ import { isPathway, pathwaysToGeometry } from "../pathway/index.js"
 import { Queue } from "../../interpreter/queue.js"
 import { sampleGeometry } from "../sample.js"
 import { findPathTo } from "./pathfinding.js"
+import { NestedTransformation } from "../../index.js"
 
 const TIME_STEP = 0.1 //ms
 
@@ -35,7 +36,11 @@ export const entityTypeDefaults = {
 const positionHelper = new Vector3()
 
 function distanceTo(dx: number, dy: number, dz: number) {
-    return Math.sqrt(dx * dx + dy * dy + dz * dz)
+    const squared = dx * dx + dy * dy + dz * dz
+    if (squared === 0) {
+        return 0
+    }
+    return Math.sqrt(squared)
 }
 
 export const operations: Operations = {
@@ -98,6 +103,34 @@ export const operations: Operations = {
         includeQueue: true,
         includeThis: false,
     },
+    pathOnToAndDodge: {
+        defaultParameters: [],
+        execute: (
+            next,
+            astId,
+            entity: MotionEntity,
+            queue: Queue,
+            type: string,
+            { x, y, z }: { x: number; y: number; z: number }
+        ) => {
+            const keyframe = entity.keyframes[entity.keyframes.length - 1]
+            const path = findPathTo(queue, type, entity.radius, keyframe, x, y, z)
+            if (path != null) {
+                return next(
+                    entity,
+                    ...path.map<NestedTransformation>(({ x, y, z }) => ({
+                        type: "precomputedOperation",
+                        identifier: "moveToAndDodge",
+                        parameters: [x, y, z],
+                        astId,
+                    }))
+                )
+            }
+            return next(entity, { type: "operation", identifier: "wait", astId, children: [{ type: "raw", value: 1 }] })
+        },
+        includeQueue: true,
+        includeThis: true,
+    },
     pathOnTo: {
         defaultParameters: [],
         execute: (
@@ -111,26 +144,17 @@ export const operations: Operations = {
             const keyframe = entity.keyframes[entity.keyframes.length - 1]
             const path = findPathTo(queue, type, entity.radius, keyframe, x, y, z)
             if (path != null) {
-                let { x: prevX, y: prevY, z: prevZ, t } = keyframe
-                for (const { x, y, z } of path) {
-                    const dt = distanceTo(prevX - x, prevY - y, prevZ - z) / keyframe.speed
-                    t += dt
-                    entity.keyframes.push({ astId, x, y, z, t, speed: keyframe.speed })
-                    prevX = x
-                    prevY = y
-                    prevZ = z
-                }
-            } else {
-                entity.keyframes.push({
-                    astId,
-                    x: keyframe.x,
-                    y: keyframe.y,
-                    z: keyframe.z,
-                    t: keyframe.t + 1,
-                    speed: keyframe.speed,
-                })
+                return next(
+                    entity,
+                    ...path.map<NestedTransformation>(({ x, y, z }) => ({
+                        type: "precomputedOperation",
+                        identifier: "moveTo",
+                        parameters: [x, y, z],
+                        astId,
+                    }))
+                )
             }
-            return next(entity)
+            return next(entity, { type: "operation", identifier: "wait", astId, children: [{ type: "raw", value: 1 }] })
         },
         includeQueue: true,
         includeThis: true,
@@ -221,9 +245,15 @@ export const operations: Operations = {
             const stepDistance = Math.min(TIME_STEP * speed, fullDistanceLength)
             const stepDuration = stepDistance / speed
             //normalise and apply the step size
-            dx = (dx / fullDistanceLength) * stepDistance
-            dy = (dy / fullDistanceLength) * stepDistance
-            dz = (dz / fullDistanceLength) * stepDistance
+            if (fullDistanceLength === 0) {
+                dx = 0
+                dy = 0
+                dz = 0
+            } else {
+                dx = (dx / fullDistanceLength) * stepDistance
+                dy = (dy / fullDistanceLength) * stepDistance
+                dz = (dz / fullDistanceLength) * stepDistance
+            }
 
             const newX = x + dx
             const newY = y + dy
@@ -235,8 +265,8 @@ export const operations: Operations = {
             const nextT = t + stepDuration
             if (
                 !isColliding(
+                    entity,
                     queue.list.map(({ value: { raw } }) => raw).concat(queue.results.map(({ raw }) => raw)),
-                    entity.radius,
                     positionHelper.set(newX, newY, newZ),
                     nextT
                 )
@@ -246,9 +276,10 @@ export const operations: Operations = {
                 nextY = newY
                 nextZ = newZ
             }
+
             entity.keyframes.push({ x: nextX, y: nextY, z: nextZ, t: nextT, astId, speed })
 
-            if (stepDuration <= TIME_STEP) {
+            if (fullDistanceLength <= stepDistance) {
                 return next(entity) //done
             }
             return next(entity, {
@@ -263,16 +294,16 @@ export const operations: Operations = {
 
 const targetEntityPositionHelper = new Vector3()
 
-function isColliding(environment: Array<any>, radius: number, position: Vector3, time: number) {
+function isColliding(entity: MotionEntity, environment: Array<any>, position: Vector3, time: number) {
     for (const value of environment) {
-        if (isMotionEntity(value)) {
+        if (value != entity && isMotionEntity(value)) {
             const index = getKeyframeIndex(value.keyframes, time, TIME_STEP + 0.001)
             if (index == null) {
                 continue
             }
             getEntityPositionAt(value.keyframes, time, index, targetEntityPositionHelper)
             const distance = position.distanceTo(targetEntityPositionHelper)
-            if (distance < value.radius + radius) {
+            if (distance < value.radius + entity.radius) {
                 return true
             }
         }

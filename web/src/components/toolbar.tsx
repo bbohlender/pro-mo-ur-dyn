@@ -17,7 +17,7 @@ export function Toolbar() {
     const showAgentPaths = useStore((state) => state.showAgentPaths)
     return (
         <Panel className="rounded gap-3 p-3 flex flex-col">
-            <div onClick={importAgents} className="btn btn-outline border-slate-300 btn-sm">
+            <div onClick={() => importAgents(0.1, 0.01)} className="btn btn-outline border-slate-300 btn-sm">
                 Import Agents
             </div>
             <div onClick={importBuildingsPathways} className="btn btn-outline border-slate-300 btn-sm">
@@ -76,7 +76,7 @@ async function importBuildingsPathways() {
     })
 }
 
-async function importAgents() {
+async function importAgents(spaceScale: number, timeScale: number) {
     const text = await (await fetch("bookstore0.txt")).text()
     const dataset = text.split("\n").map((line) => line.split(" "))
     const map = new Map<
@@ -96,11 +96,11 @@ async function importAgents() {
     for (const [id, x1, y1, x2, y2, t, u1, u2, u3, type] of dataset) {
         const entry = map.get(id) ?? []
         entry.push({
-            x1: +x1 / 100,
-            y1: +y1 / 100,
-            x2: +x2 / 100,
-            y2: +y2 / 100,
-            t: +t / 100,
+            x1: +x1 * spaceScale,
+            y1: +y1 * spaceScale,
+            x2: +x2 * spaceScale,
+            y2: +y2 * spaceScale,
+            t: +t * timeScale,
             u1: +u1,
             u2: +u2,
             u3: +u3,
@@ -113,7 +113,7 @@ async function importAgents() {
     for (const [name, keyframes] of map.entries()) {
         const simplifiedKeyframes = simplify(
             keyframes.map((data) => ({ ...getCenter(data), t: data.t })),
-            0.1
+            0.2
         ) as Array<{
             x: number
             y: number
