@@ -1,14 +1,29 @@
-import { ParsedDescriptions, flattenAST, NestedDescriptions, parse, nestAST, WorkerInterface } from "pro-3d-video"
+import {
+    ParsedDescriptions,
+    flattenAST,
+    NestedDescriptions,
+    parse,
+    nestAST,
+    WorkerInterface,
+    ParsedTransformation,
+} from "pro-3d-video"
+import { Keyframe, MotionEntity } from "pro-3d-video/motion"
 //@ts-ignore
 import create from "zustand"
 import type x from "zustand"
 import { combine } from "zustand/middleware"
-import { clamp } from "three/src/math/MathUtils.js"
+import { clamp, generateUUID } from "three/src/math/MathUtils.js"
 import { BufferGeometryLoader } from "three"
 //@ts-ignore
 import Url from "./worker.js?url"
 
 const createZustand = create as any as typeof x.default
+
+export type DerivedSelectionState = { keyframes: Array<Keyframe>; astIds: Array<string>; resultIndices: Array<number> }
+export type PrimarySelectionState = {
+    astIds?: Array<string>
+    results?: Array<{ index: number; keyframeIndices: Array<number> }>
+}
 
 export type AppState = {
     descriptions: ParsedDescriptions
@@ -19,7 +34,10 @@ export type AppState = {
     playing: boolean
     result: any
     interpretationFinished: boolean
-    showAgentPaths: boolean
+    textEdit: boolean
+    primarySelection: PrimarySelectionState
+    derivedSelection: DerivedSelectionState
+    shift: boolean
 }
 
 const loader = new BufferGeometryLoader()
@@ -30,42 +48,170 @@ const defaultDescription = parse(`Default (interprete: false) {
 
 export const useStore = createZustand(
     combine(createInitialState(), (set, get) => ({
-        updateDescriptions(descriptions: ParsedDescriptions) {
+        updateDescriptions(descriptions: ParsedDescriptions, partial?: Partial<AppState>) {
             const requestedDuration = Math.max(get().time * 2, 10)
             get().workerInterface.terminate()
             set({
                 descriptions,
                 workerInterface: startWorkerInterface(descriptions, requestedDuration),
                 requestedDuration,
-            })
+                ...partial,
+            } as any)
         },
 
-        replaceDescriptions(parsedResult: NestedDescriptions): void {
-            this.updateDescriptions(flattenAST({ ...parsedResult, ...defaultDescription }))
+        updatePrimarySelection(primarySelection: PrimarySelectionState, partial?: Partial<AppState>) {
+            set({
+                primarySelection,
+                derivedSelection: computeDerivedSelection(primarySelection, get().result),
+                ...partial,
+            } as any)
+        },
+
+        finishTextEdit(parsedResult: NestedDescriptions): void {
+            this.updateDescriptions(flattenAST(parsedResult), { textEdit: false })
+        },
+
+        editTransformations(...edits: Array<{ astId: string; transformation: ParsedTransformation }>) {
+            const { descriptions } = get()
+            const newTransformations = { ...descriptions.transformations }
+            for (const { astId, transformation } of edits) {
+                newTransformations[astId] = transformation
+            }
+            set({
+                descriptions: {
+                    ...descriptions,
+                    transformations: newTransformations,
+                },
+            })
+        },
+        delete(): void {
+            const { descriptions, derivedSelection } = get()
+            for (const transformation of Object.values(descriptions.transformations)) {
+                if ("childrenIds" in transformation) {
+                    transformation.childrenIds = transformation.childrenIds.filter(
+                        (id) => derivedSelection.keyframes.findIndex((keyframe) => keyframe.astId === id) === -1
+                    )
+                }
+            }
+            this.updatePrimarySelection({ astIds: [], results: [] })
+        },
+        unselect(): void {
+            this.updatePrimarySelection({ astIds: [], results: [] })
+        },
+        concretise(): void {
+            //TODO
+        },
+        split(fromAstId: string, toAstId: string, percentage: number): void {
+            const {
+                descriptions: { transformations },
+            } = get()
+            const fromTransformation = transformations[fromAstId]
+            const toTransformation = transformations[toAstId]
+
+            if (
+                fromTransformation.type === "operation" &&
+                fromTransformation.identifier === "moveTo" &&
+                toTransformation.type === "operation" &&
+                toTransformation.identifier === "moveTo"
+            ) {
+                const x1 = getRawValue(transformations[fromTransformation.childrenIds[0]])
+                const y1 = getRawValue(transformations[fromTransformation.childrenIds[1]])
+                const z1 = getRawValue(transformations[fromTransformation.childrenIds[2]])
+                const x2 = getRawValue(transformations[toTransformation.childrenIds[0]])
+                const y2 = getRawValue(transformations[toTransformation.childrenIds[1]])
+                const z2 = getRawValue(transformations[toTransformation.childrenIds[2]])
+
+                const x1_5 = (x1 + x2) / 2
+                const y1_5 = (y1 + y2) / 2
+                const z1_5 = (z1 + z2) / 2
+
+                const newToAstId = `t${generateUUID()}`
+                const middleAstId = `t${generateUUID()}`
+                const middleParamXAstId = `t${generateUUID()}`
+                const middleParamYAstId = `t${generateUUID()}`
+                const middleParamZAstId = `t${generateUUID()}`
+
+                this.editTransformations(
+                    {
+                        astId: toAstId,
+                        transformation: {
+                            type: "sequential",
+                            childrenIds: [middleAstId, newToAstId],
+                        },
+                    },
+                    {
+                        astId: newToAstId,
+                        transformation: toTransformation,
+                    },
+                    {
+                        astId: middleAstId,
+                        transformation: {
+                            type: "operation",
+                            childrenIds: [middleParamXAstId, middleParamYAstId, middleParamZAstId],
+                            identifier: "moveTo",
+                        },
+                    },
+                    {
+                        astId: middleParamXAstId,
+                        transformation: {
+                            type: "raw",
+                            value: x1_5,
+                        },
+                    },
+                    {
+                        astId: middleParamYAstId,
+                        transformation: {
+                            type: "raw",
+                            value: y1_5,
+                        },
+                    },
+                    {
+                        astId: middleParamZAstId,
+                        transformation: {
+                            type: "raw",
+                            value: z1_5,
+                        },
+                    }
+                )
+            }
+        },
+
+        select(primarySelection: PrimarySelectionState): void {
+            const { shift, primarySelection: prevPrimarySelection } = get()
+            if (shift) {
+                this.updatePrimarySelection({
+                    astIds: [...(prevPrimarySelection.astIds ?? []), ...(primarySelection.astIds ?? [])],
+                    results: [...(prevPrimarySelection.results ?? []), ...(primarySelection.results ?? [])],
+                })
+            } else {
+                this.updatePrimarySelection(primarySelection)
+            }
+        },
+
+        beginTextEdit(): void {
+            set({ textEdit: true })
         },
 
         togglePlaying() {
             set({ playing: !get().playing })
         },
 
-        setShowAgentPaths(showAgentPaths: boolean) {
-            set({ showAgentPaths })
-        },
-
         replaceResult({ agents = [], building, footwalk, street }: any, duration: number, final: boolean) {
+            const result = {
+                agents,
+                building: building == null ? undefined : loader.parse(building),
+                street: street == null ? undefined : loader.parse(street),
+                footwalk: footwalk == null ? undefined : loader.parse(footwalk),
+            }
             set({
-                result: {
-                    agents,
-                    building: building == null ? undefined : loader.parse(building),
-                    street: street == null ? undefined : loader.parse(street),
-                    footwalk: footwalk == null ? undefined : loader.parse(footwalk),
-                },
+                result,
                 duration,
                 interpretationFinished: final,
+                derivedSelection: computeDerivedSelection(get().primarySelection, result),
             })
         },
 
-        //TODO: appendResult(results: Array<Value>) {},
+        //TODOv2: appendResult(results: Array<Value>) {},
 
         addDescriptions(nestedDescriptions: NestedDescriptions) {
             this.updateDescriptions(flattenAST({ ...nestedDescriptions, ...nestAST(get().descriptions, true) }))
@@ -76,6 +222,44 @@ export const useStore = createZustand(
         },
     }))
 )
+
+function getRawValue(transformation: ParsedTransformation): any {
+    if (transformation.type != "raw") {
+        throw new Error(`unexpected type "${transformation}" of transformation`)
+    }
+    return transformation.value
+}
+
+function computeDerivedSelection(
+    { astIds: astIdsSelection, results: resultsSelection }: PrimarySelectionState,
+    result: any
+): DerivedSelectionState {
+    const agents: Array<MotionEntity> = result.agents
+    const keyframeSet = new Set<Keyframe>()
+    const astIds = new Set<string>(astIdsSelection)
+    const resultIndices = new Set<number>(resultsSelection?.map(({ index }) => index))
+    for (let agentIndex = 0; agentIndex < agents.length; agentIndex++) {
+        const keyframes = agents[agentIndex].keyframes
+        const resultSelection = resultsSelection?.filter(({ index }) => agentIndex === index)
+        for (let keyframeIndex = 0; keyframeIndex < keyframes.length; keyframeIndex++) {
+            const keyframe = keyframes[keyframeIndex]
+            if (resultSelection?.find(({ keyframeIndices }) => keyframeIndices.includes(keyframeIndex)) != null) {
+                keyframeSet.add(keyframe)
+                astIds.add(keyframe.astId)
+                continue
+            }
+            if (astIdsSelection?.includes(keyframe.astId)) {
+                keyframeSet.add(keyframe)
+                resultIndices.add(agentIndex)
+            }
+        }
+    }
+    return {
+        keyframes: Array.from(keyframeSet),
+        astIds: Array.from(astIds),
+        resultIndices: Array.from(resultIndices),
+    }
+}
 
 export function updateTime(delta: number) {
     const state = useStore.getState()
@@ -105,8 +289,11 @@ function createInitialState(): AppState {
         playing: true,
         result: {},
         interpretationFinished: true,
-        showAgentPaths: false,
         requestedDuration,
+        textEdit: false,
+        primarySelection: {},
+        derivedSelection: { keyframes: [], astIds: [], resultIndices: [] },
+        shift: false,
     }
 }
 

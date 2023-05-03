@@ -1,56 +1,223 @@
-import { isMotionEntity } from "pro-3d-video/motion"
-import { Value } from "pro-3d-video"
-import { useStore } from "../state/store.js"
-import { ReactNode, useMemo } from "react"
+import { MotionEntity, Keyframe, getKeyframeIndex } from "pro-3d-video/motion"
+import { AppState, useStore } from "../state/store.js"
 import { Panel } from "./panel.js"
+import { generateUUID } from "three/src/math/MathUtils.js"
+import { Key, RefObject, useEffect, useMemo, useRef } from "react"
+
+const lineHeight = 3
+const yPadding = 1
+const xPadding = 1
+const fontSize = 1
+const circleSize = 0.5
+
+const textWidth = 5
 
 export function ProceduralLine() {
-    const result = useStore((state) => state.result)
-    const duration = useStore((state) => state.duration)
+    const panelRef = useRef<HTMLDivElement>(null)
+    const svgTextRef = useRef<SVGSVGElement>(null)
+    const svgLinesRef = useRef<SVGSVGElement>(null)
+    const agentsLength = useStore((state) => state.result.agents?.length ?? 0) as number
+
+    const functions = useMemo(() => {
+        let textsIndex = 0
+        const texts: Array<SVGTextElement> = []
+
+        let circlesIndex = 0
+        const circles: Array<SVGCircleElement> = []
+
+        let rectsIndex = 0
+        const rects: Array<SVGRectElement> = []
+
+        return {
+            createText() {
+                if (textsIndex < texts.length) {
+                    const result = texts[textsIndex++]
+                    result.setAttribute("visibility", "visible")
+                    return result
+                }
+
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text")
+                svgTextRef.current!.appendChild(text)
+
+                texts.push(text)
+                return text
+            },
+            createCircle() {
+                if (circlesIndex < circles.length) {
+                    const result = circles[circlesIndex++]
+                    result.setAttribute("visibility", "visible")
+                    return result
+                }
+                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle")
+                svgLinesRef.current!.appendChild(circle)
+
+                circles.push(circle)
+                return circle
+            },
+            createRect() {
+                if (rectsIndex < rects.length) {
+                    const result = rects[rectsIndex++]
+                    result.setAttribute("visibility", "visible")
+                    return result
+                }
+                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+                svgLinesRef.current!.appendChild(rect)
+
+                rects.push(rect)
+                return rect
+            },
+            reset() {
+                for (const rect of rects) {
+                    rect.setAttribute("visibility", "hidden")
+                }
+                for (const text of texts) {
+                    text.setAttribute("visibility", "hidden")
+                }
+                for (const circle of circles) {
+                    circle.setAttribute("visibility", "hidden")
+                }
+                textsIndex = 0
+                circlesIndex = 0
+                rectsIndex = 0
+            },
+        }
+    }, [])
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (panelRef.current == null || svgLinesRef.current == null || svgTextRef.current == null) {
+                return
+            }
+            const state = useStore.getState()
+            const agents = state.result.agents as Array<MotionEntity> | undefined
+            if (agents == null) {
+                return
+            }
+
+            const panelBounding = panelRef.current.getBoundingClientRect()
+
+            const lineHeightPixels = convertRemToPixels(lineHeight)
+            const startIndex = Math.floor(panelRef.current.scrollTop / lineHeightPixels)
+            const endIndex = Math.min(
+                agents.length - 1,
+                Math.ceil((panelRef.current.scrollTop + panelBounding.height) / lineHeightPixels)
+            )
+
+            svgTextRef.current.style.minWidth = rem(textWidth)
+            svgTextRef.current.style.minHeight = rem(agents.length * lineHeight)
+
+            svgLinesRef.current.style.left = rem(textWidth)
+            svgLinesRef.current.style.minWidth = (panelBounding.width - convertRemToPixels(textWidth)).toString()
+            svgLinesRef.current.style.minHeight = rem(agents.length * lineHeight)
+
+            functions.reset()
+            for (let i = startIndex; i <= endIndex; i++) {
+                updateEntitiyLine(
+                    state,
+                    svgLinesRef.current!.getBoundingClientRect().width,
+                    agents,
+                    i,
+                    functions.createText,
+                    functions.createCircle,
+                    functions.createRect
+                )
+            }
+        }, 30)
+        return () => {
+            clearInterval(interval)
+        }
+    }, [functions])
+
+    if (agentsLength === 0) {
+        return null
+    }
+
     return (
-        <Panel className="flex gap-5 flex-col p-5 max-h-10 overflow-y-auto">
-            {result
-                .filter((value) => isMotionEntity(value.raw))
-                .map((value, i) => (
-                    <EntityLine key={i} duration={duration} value={value} />
-                ))}
+        <Panel ref={panelRef} className="flex gap-5 flex-col max-h-40 overflow-y-auto">
+            <svg className="overflow-hidden" ref={svgTextRef} />
+            <svg className="absolute left-0 overflow-hidden" ref={svgLinesRef} overflow="hidden">
+                <line stroke="black" strokeWidth={2} y1="0%" y2="100%" x1="50%" x2="50%" />
+            </svg>
         </Panel>
     )
 }
 
-function EntityLine({ value, duration }: { value: Value; duration: number }) {
-    if (!isMotionEntity(value.raw)) {
-        return null
+function convertRemToPixels(rem: number) {
+    return rem * parseFloat(getComputedStyle(document.documentElement).fontSize)
+}
+
+function rem(x: number) {
+    return `${x}rem`
+}
+
+const lineDuration = 10
+
+function updateEntitiyLine(
+    state: AppState,
+    lineWidth: number,
+    entities: Array<MotionEntity>,
+    entityIndex: number,
+    createText: () => SVGTextElement,
+    createCircle: () => SVGCircleElement,
+    createRect: () => SVGRectElement
+): void {
+    const lineStartY = entityIndex * lineHeight
+    const text = createText()
+    text.innerHTML = "Name"
+    text.setAttribute("x", rem(xPadding))
+    text.setAttribute("y", rem(yPadding + lineStartY + fontSize))
+    text.setAttribute("fontSize", rem(fontSize))
+
+    const beginTime = state.time - lineDuration / 2
+    const endTime = state.time + lineDuration / 2
+
+    const entity = entities[entityIndex]
+    let keyframeIndex = 0
+    const t = Math.max(0, beginTime)
+    while (keyframeIndex + 1 < entity.keyframes.length && entity.keyframes[keyframeIndex + 1].t < t) {
+        keyframeIndex++
     }
-    const entity = value.raw
-    const children = useMemo(() => {
-        const c: Array<ReactNode> = []
-        let lastKeyframeTime: number | undefined = undefined
-        for (const keyframe of entity.keyframes) {
-            const keyframeTime = keyframe.t
 
-            if (lastKeyframeTime != null) {
-                c.push(
-                    <div
-                        key={keyframeTime}
-                        onClick={() => console.log(value)}
-                        style={{ flexGrow: keyframeTime - lastKeyframeTime }}
-                        className="p-1.5 bg-slate-400 rounded-lg"></div>
-                )
-            }
+    if (keyframeIndex + 1 >= entity.keyframes.length) {
+        return
+    }
 
-            c.push(<div key={keyframeTime + "result"} className="p-1.5 rounded-lg bg-primary"></div>)
+    //keyframeIndex is now one before the first keyframe that is between begin and end
 
-            lastKeyframeTime = keyframeTime
-        }
-        c.push(<div key="end" style={{ flexGrow: duration - (lastKeyframeTime ?? 0) }}></div>)
-        return c
-    }, [entity])
-    return (
-        <div className="flex flex-row gap-5 items-center">
-            <div style={{ minWidth: "3rem", maxWidth: "3rem", wordBreak: "break-all" }}>Name</div>
-            <div className="flex gap-2 flex-row flex-grow">{children}</div>
-            <div style={{ minWidth: "3rem", maxWidth: "3rem" }}></div>
-        </div>
-    )
+    while (keyframeIndex + 1 < entity.keyframes.length && entity.keyframes[keyframeIndex].t < endTime) {
+        const circle = createCircle()
+        circle.setAttribute("r", rem(circleSize / 2))
+        circle.setAttribute(
+            "cx",
+            (((entity.keyframes[keyframeIndex].t - beginTime) / lineDuration) * lineWidth).toString()
+        )
+        circle.setAttribute("cy", rem(yPadding + lineStartY + fontSize / 2))
+        circle.setAttribute("fill", "red")
+
+        const rect = createRect()
+
+        rect.setAttribute("y", rem(yPadding + lineStartY + fontSize / 2 - circleSize / 2))
+        rect.setAttribute(
+            "x",
+            (
+                ((entity.keyframes[keyframeIndex].t - beginTime) / lineDuration) * lineWidth +
+                convertRemToPixels(circleSize)
+            ).toString()
+        )
+
+        rect.setAttribute("rx", "5")
+        rect.setAttribute(
+            "width",
+            Math.max(
+                0,
+                ((entity.keyframes[keyframeIndex + 1].t - entity.keyframes[keyframeIndex].t) / lineDuration) *
+                    lineWidth -
+                    convertRemToPixels(circleSize) * 2
+            ).toString()
+        )
+
+        rect.setAttribute("height", rem(circleSize))
+
+        keyframeIndex++
+    }
 }

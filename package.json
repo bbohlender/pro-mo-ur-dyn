@@ -10,7 +10,8 @@
         "fix": "run-s fix:prettier fix:eslint",
         "fix:prettier": "prettier --write 'src/**/*.{ts,tsx}'",
         "fix:eslint": "eslint src --fix",
-        "test": "nyc mocha ./tests/*.spec.ts --timeout 15000"
+        "test": "nyc mocha ./tests/*.spec.ts --timeout 15000",
+        "test:serializer": "nyc mocha ./tests/serializer.spec.ts --timeout 15000"
     },
     "exports": {
         ".": "./dist/index.js",

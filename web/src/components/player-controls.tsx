@@ -7,13 +7,14 @@ export function PlayerControls() {
     const barRef = useRef<HTMLDivElement>(null)
     const playing = useStore((state) => state.playing)
     useEffect(() => {
-        setInterval(() => {
+        const interval = setInterval(() => {
             if (barRef.current == null) {
                 return
             }
             const fraction = useStore.getState().time / Math.max(0.00001, useStore.getState().duration)
             barRef.current.style.width = `${(fraction * 100).toFixed(3)}%`
         })
+        return () => clearInterval(interval)
     }, [])
     return (
         <Panel className="flex flex-row items-center gap-5 p-5">
@@ -50,9 +51,10 @@ export function PlayerControls() {
 function Time() {
     const [time, setTime] = useState("0")
     useEffect(() => {
-        setInterval(() => {
+        const interval = setInterval(() => {
             setTime(useStore.getState().time.toFixed(2))
         }, 100)
+        return () => clearInterval(interval)
     }, [])
     return <div className="absolute top-3">{time}</div>
 }

@@ -7,6 +7,7 @@ import { Operations, interpreteTransformationSynchronous, WorkerInterface } from
 //  complex description that returns multiple intermediate results but that does pause completly
 //  complex description that is indefinite, returns intermediate results until requested progress is reached, which is then some time later extended
 
+/*
 function testInterpreteSynchronously(text: string, operations: Operations = {}, seed?: number): any {
     const descriptions = parse(text)
     const [description] = Object.values(descriptions)
@@ -29,7 +30,7 @@ function testInterpreteSynchronously(text: string, operations: Operations = {}, 
         }
     )
     return raw
-}
+}*/
 
 /* describe("interprete grammar synchronously", () => {
     it("should interprete sequential execution", async () => {

@@ -1,3 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+.text-ui {
+    font-size: 1rem;
+    font-family: monospace;
+}

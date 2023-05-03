@@ -101,11 +101,6 @@ function flattenTransformation(
                 nounIdentifierIdMap,
                 nestedDescriptions[nestedTransformation.descriptionIdentifier].nouns
             ),
-            descriptionId: getDescriptionId(
-                nestedTransformation.descriptionIdentifier,
-                descriptionIdentifierIdMap,
-                nestedDescriptions
-            ),
         }
         return transformationId
     }
@@ -113,7 +108,13 @@ function flattenTransformation(
         const { children, ...rest } = nestedTransformation
         transformations[transformationId] = {
             childrenIds: children.map((child) =>
-                flattenTransformation(child, transformations, nounIdentifierIdMap, descriptionIdentifierIdMap, nestedDescriptions)
+                flattenTransformation(
+                    child,
+                    transformations,
+                    nounIdentifierIdMap,
+                    descriptionIdentifierIdMap,
+                    nestedDescriptions
+                )
             ),
             ...rest,
         } as any
@@ -183,9 +184,9 @@ export function nestTransformation(
         if (noun == null) {
             throw new Error(`unknown noun "${parsedTransformation.nounId}"`)
         }
-        const description = descriptions[parsedTransformation.descriptionId]
+        const description = descriptions[noun.descriptionId]
         if (description == null) {
-            throw new Error(`unknown description "${parsedTransformation.descriptionId}"`)
+            throw new Error(`unknown description "${noun.descriptionId}"`)
         }
         transformation = {
             type: "nounReference",

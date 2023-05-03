@@ -238,7 +238,7 @@ export function convertLotsToDescriptions(layers: Layers): NestedDescriptions {
                 { type: "nounReference", nounIdentifier: "Building", descriptionIdentifier: "Default" }
             )
         }
-        descriptions[`Building-${i}`] = {
+        descriptions[`Building${i}`] = {
             initialVariables: { type: "building" },
             nouns: {
                 Start: {

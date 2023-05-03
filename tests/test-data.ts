@@ -52,7 +52,7 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                 rootNounIdentifier: "a",
             },
         },
-        unparsed: `A { a --> -this + 1 * 3 > 2 && false -> 2 | 2 }`,
+        unparsed: `A () { a --> -this + 1 * 3 > 2 && false -> 2 | 2 }`,
     },
     {
         parsed: {
@@ -61,41 +61,36 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                 nouns: {
                     a: {
                         transformation: {
-                            type: "setVariable",
-                            identifier: "x",
+                            type: "sequential",
                             children: [
                                 {
-                                    type: "sequential",
+                                    type: "setVariable",
+                                    identifier: "x",
+                                    children: [{ type: "raw", value: 11 }],
+                                },
+                                { type: "%", children: [{ type: "this" }, { type: "raw", value: 2 }] },
+                                {
+                                    type: "switch",
+                                    cases: [[0, 1], [3]],
                                     children: [
-                                        { type: "raw", value: 11 },
-                                        { type: "%", children: [{ type: "this" }, { type: "raw", value: 2 }] },
+                                        { type: "raw", value: 2 },
                                         {
-                                            type: "switch",
-                                            cases: [[0, 1], [3]],
+                                            type: "if",
                                             children: [
-                                                { type: "raw", value: 2 },
                                                 {
-                                                    type: "if",
-                                                    children: [
-                                                        {
-                                                            type: "==",
-                                                            children: [{ type: "this" }, { type: "raw", value: 0 }],
-                                                        },
-                                                        { type: "this" },
-                                                        {
-                                                            type: "*",
-                                                            children: [{ type: "this" }, { type: "raw", value: 2 }],
-                                                        },
-                                                    ],
+                                                    type: "==",
+                                                    children: [{ type: "this" }, { type: "raw", value: 0 }],
                                                 },
+                                                { type: "this" },
                                                 {
-                                                    type: "sequential",
-                                                    children: [
-                                                        { type: "getVariable", identifier: "x" },
-                                                        { type: "null" },
-                                                    ],
+                                                    type: "*",
+                                                    children: [{ type: "this" }, { type: "raw", value: 2 }],
                                                 },
                                             ],
+                                        },
+                                        {
+                                            type: "sequential",
+                                            children: [{ type: "getVariable", identifier: "x" }, { type: "null" }],
                                         },
                                     ],
                                 },
@@ -106,7 +101,7 @@ export const parsedAndUnparsedGrammarPairs: Array<{
                 rootNounIdentifier: "a",
             },
         },
-        unparsed: `ABC { a --> this.x = 11 -> this % 2 -> switch 2 { case 0: case 1: if this == 0 then { this } else { this * 2 } case 3: this.x -> null } }`,
+        unparsed: `ABC () { a --> this.x = 11 -> this % 2 -> switch 2 { case 0: case 1: if this == 0 then { this } else { this * 2 } case 3: this.x -> null } }`,
     },
     {
         parsed: {

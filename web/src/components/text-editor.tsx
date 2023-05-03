@@ -1,11 +1,11 @@
 import { HTMLProps, KeyboardEvent, useEffect, useMemo, useState } from "react"
 import { useStore } from "../state/store.js"
-import { NestedDescriptions, parse } from "pro-3d-video"
-import { PencilSquareIcon, ExclamationCircleIcon } from "@heroicons/react/20/solid"
+import { NestedDescriptions, parse, serializeString } from "pro-3d-video"
+import { CheckCircleIcon, CheckIcon, ExclamationCircleIcon } from "@heroicons/react/20/solid"
 import { Panel } from "./panel.js"
 
 export function TextEditor() {
-    const [text, setText] = useState("")
+    const [text, setText] = useState(() => serializeString(useStore.getState().descriptions))
 
     useEffect(() => {
         useStore.subscribe((state, prevState) => {
@@ -24,28 +24,23 @@ export function TextEditor() {
     }, [text])
 
     return (
-        <Panel className="flex relative p-3 h-full">
+        <Panel style={{ maxWidth: 340 }} className="text-ui flex-grow flex relative p-5 h-full">
             <textarea
                 autoFocus
-                style={{ width: 260, resize: "none", outline: 0, tabSize: 2 }}
+                style={{ resize: "none", outline: 0, tabSize: 2 }}
                 value={text}
                 spellCheck={false}
                 onKeyDown={(e) => onKeyDown(e, setText)}
                 onChange={(e) => setText(e.target.value)}
-                className="text-slate-950 bg-transparent p-3 border-0 flex-basis-0 flex-grow"
+                className="text-slate-950 bg-transparent border-0 flex-basis-0 flex-grow"
             />
             {"error" in parseResult ? (
-                <ErrorMessage
-                    style={{ position: "absolute", bottom: "1rem", left: "1rem", right: "1rem" }}
-                    align="right"
-                    message={parseResult.error}
-                />
+                <ErrorMessage align="right" className="absolute bottom-3 left-3 right-3" message={parseResult.error} />
             ) : (
                 <button
-                    className="btn p-2 aspect-square btn-primary rounded-full flex items-center"
-                    style={{ position: "absolute", right: "1rem", bottom: "1rem" }}
-                    onClick={() => useStore.getState().replaceDescriptions(parseResult.result)}>
-                    <PencilSquareIcon />
+                    className="btn btn-sm p-2 aspect-square btn-primary rounded-full flex items-center absolute right-5 bottom-5"
+                    onClick={() => useStore.getState().finishTextEdit(parseResult.result)}>
+                    <CheckIcon />
                 </button>
             )}
         </Panel>
@@ -90,11 +85,11 @@ export function ErrorMessage({
                         overflowY: "auto",
                         fontSize: "0.8rem",
                         overflowX: "hidden",
-                        maxWidth: "20rem",
+                        maxWidth: "19rem",
                         maxHeight: "8rem",
                         whiteSpace: "pre-line",
                         wordWrap: "break-word",
-                        bottom: 52,
+                        bottom: "2rem",
                     }}
                     className="rounded absolute mb-2 p-2 bg-error text-slate-50">
                     {message}
@@ -102,7 +97,7 @@ export function ErrorMessage({
             )}
             <div
                 onClick={() => setOpen((open) => !open)}
-                className="btn p-2 aspect-square btn-error rounded-full flex items-center">
+                className="btn btn-sm p-2 aspect-square btn-error rounded-full flex items-center">
                 <ExclamationCircleIcon />
             </div>
         </div>

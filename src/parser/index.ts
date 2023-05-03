@@ -67,7 +67,6 @@ export type ParsedOperation = {
 export type ParsedNounReference = {
     type: "nounReference"
     nounId: string
-    descriptionId: string
 }
 export type ParsedRaw = {
     type: "raw"

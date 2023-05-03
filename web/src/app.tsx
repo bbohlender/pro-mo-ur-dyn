@@ -8,6 +8,7 @@ import { Suspense } from "react"
 import { useStore } from "./state/store.js"
 import { DragEvent } from "react"
 import { parse } from "pro-3d-video"
+import { PathControl } from "./components/controls/path.js"
 
 async function onDrop(store: typeof useStore, e: DragEvent<HTMLDivElement>) {
     e.stopPropagation()
@@ -16,7 +17,7 @@ async function onDrop(store: typeof useStore, e: DragEvent<HTMLDivElement>) {
         try {
             const text = await e.dataTransfer.files[0].text()
             const parsed = parse(text)
-            store.getState().replaceDescriptions(parsed)
+            store.getState().finishTextEdit(parsed)
         } catch (error: any) {
             alert(error.message)
         }
