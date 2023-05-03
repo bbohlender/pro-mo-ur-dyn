@@ -7,3 +7,20 @@
     font-size: 1rem;
     font-family: monospace;
 }
+
+
+.hovered {
+    background-color: aquamarine;
+    border-radius: 0.3rem;
+    margin: -0.3rem;
+    padding: 0.3rem;
+    cursor: pointer;
+}
+
+.selected {
+    background-color: aqua;
+    border-radius: 0.3rem;
+    margin: -0.3rem;
+    padding: 0.3rem;
+    cursor: pointer;
+}

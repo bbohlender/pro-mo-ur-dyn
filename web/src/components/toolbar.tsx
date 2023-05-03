@@ -14,7 +14,6 @@ import { exportGeometryResult } from "./viewer/geometry-result.js"
 import { exportMotion } from "./viewer/agents.js"
 
 export function Toolbar() {
-    const showAgentPaths = useStore((state) => state.showAgentPaths)
     return (
         <Panel className="rounded gap-3 p-3 flex flex-col">
             <div onClick={() => importAgents(0.1, 0.01)} className="btn btn-outline border-slate-300 btn-sm">
@@ -26,15 +25,6 @@ export function Toolbar() {
             <div onClick={exportScene} className="btn btn-outline border-slate-300 btn-sm">
                 Export
             </div>
-            <label className="label cursor-pointer">
-                <span className="label-text mr-2">Show Agent Paths</span>
-                <input
-                    onChange={(e) => useStore.getState().setShowAgentPaths(e.target.checked)}
-                    checked={showAgentPaths}
-                    type="checkbox"
-                    className="toggle toggle-primary"
-                />
-            </label>
         </Panel>
     )
 }

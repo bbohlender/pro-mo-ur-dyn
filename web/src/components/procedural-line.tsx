@@ -8,7 +8,7 @@ const lineHeight = 3
 const yPadding = 1
 const xPadding = 1
 const fontSize = 1
-const circleSize = 0.5
+const circleSize = 0.8
 
 const textWidth = 5
 
@@ -21,6 +21,9 @@ export function ProceduralLine() {
     const functions = useMemo(() => {
         let textsIndex = 0
         const texts: Array<SVGTextElement> = []
+
+        let textRectsIndex = 0
+        const textRects: Array<SVGRectElement> = []
 
         let circlesIndex = 0
         const circles: Array<SVGCircleElement> = []
@@ -42,6 +45,19 @@ export function ProceduralLine() {
                 texts.push(text)
                 return text
             },
+            createTextRect() {
+                if (textRectsIndex < textRects.length) {
+                    const result = textRects[textRectsIndex++]
+                    result.setAttribute("visibility", "visible")
+                    return result
+                }
+                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+                svgTextRef.current!.appendChild(rect)
+
+                textRects.push(rect)
+                return rect
+            },
+
             createCircle() {
                 if (circlesIndex < circles.length) {
                     const result = circles[circlesIndex++]
@@ -118,6 +134,7 @@ export function ProceduralLine() {
                     agents,
                     i,
                     functions.createText,
+                    functions.createTextRect,
                     functions.createCircle,
                     functions.createRect
                 )
@@ -133,11 +150,13 @@ export function ProceduralLine() {
     }
 
     return (
-        <Panel ref={panelRef} className="flex gap-5 flex-col max-h-40 overflow-y-auto">
-            <svg className="overflow-hidden" ref={svgTextRef} />
-            <svg className="absolute left-0 overflow-hidden" ref={svgLinesRef} overflow="hidden">
-                <line stroke="black" strokeWidth={2} y1="0%" y2="100%" x1="50%" x2="50%" />
-            </svg>
+        <Panel>
+            <div ref={panelRef} className="max-h-40 overflow-y-auto relative">
+                <svg className="overflow-hidden" ref={svgTextRef} />
+                <svg className="absolute top-0 left-0 overflow-hidden" ref={svgLinesRef} overflow="hidden">
+                    <line stroke="black" strokeWidth={2} y1="0%" y2="100%" x1="50%" x2="50%" />
+                </svg>
+            </div>
         </Panel>
     )
 }
@@ -158,15 +177,30 @@ function updateEntitiyLine(
     entities: Array<MotionEntity>,
     entityIndex: number,
     createText: () => SVGTextElement,
+    createTextRect: () => SVGRectElement,
     createCircle: () => SVGCircleElement,
     createRect: () => SVGRectElement
 ): void {
     const lineStartY = entityIndex * lineHeight
+
     const text = createText()
     text.innerHTML = "Name"
+    text.onclick = () => useStore.getState().select({ results: [{ index: entityIndex }] })
     text.setAttribute("x", rem(xPadding))
     text.setAttribute("y", rem(yPadding + lineStartY + fontSize))
     text.setAttribute("fontSize", rem(fontSize))
+
+    const selected = state.derivedSelection.keyframeIndiciesMap.has(entityIndex)
+
+    if (selected) {
+        const textBg = createTextRect()
+        textBg.setAttribute("x", rem(xPadding - 0.5))
+        textBg.setAttribute("y", rem(yPadding + lineStartY - 0.5))
+        textBg.setAttribute("width", rem(textWidth + 1))
+        textBg.setAttribute("height", rem(fontSize + 1))
+        textBg.setAttribute("rx", "5")
+        textBg.setAttribute("fill", "aqua")
+    }
 
     const beginTime = state.time - lineDuration / 2
     const endTime = state.time + lineDuration / 2
@@ -184,25 +218,36 @@ function updateEntitiyLine(
 
     //keyframeIndex is now one before the first keyframe that is between begin and end
 
+    let currentSelected = state.derivedSelection.keyframes.includes(entity.keyframes[keyframeIndex])
     while (keyframeIndex + 1 < entity.keyframes.length && entity.keyframes[keyframeIndex].t < endTime) {
+        const currentKeyframe = entity.keyframes[keyframeIndex]
+        const nextKeyframe = entity.keyframes[keyframeIndex + 1]
+        const nextSelected = state.derivedSelection.keyframes.includes(nextKeyframe)
         const circle = createCircle()
+        const i = keyframeIndex
+        circle.onclick = () => {
+            useStore.getState().select({
+                results: [{ index: entityIndex, keyframeIndices: [i] }],
+            })
+        }
+
         circle.setAttribute("r", rem(circleSize / 2))
-        circle.setAttribute(
-            "cx",
-            (((entity.keyframes[keyframeIndex].t - beginTime) / lineDuration) * lineWidth).toString()
-        )
+        circle.setAttribute("cx", (((currentKeyframe.t - beginTime) / lineDuration) * lineWidth).toString())
         circle.setAttribute("cy", rem(yPadding + lineStartY + fontSize / 2))
-        circle.setAttribute("fill", "red")
+        circle.setAttribute("fill", currentSelected ? "aqua" : "gray")
 
         const rect = createRect()
 
+        rect.onclick = () =>
+            useStore.getState().select({
+                results: [{ index: entityIndex, keyframeIndices: [i, i + 1] }],
+            })
+
+        rect.setAttribute("fill", currentSelected && nextSelected ? "aqua" : "gray")
         rect.setAttribute("y", rem(yPadding + lineStartY + fontSize / 2 - circleSize / 2))
         rect.setAttribute(
             "x",
-            (
-                ((entity.keyframes[keyframeIndex].t - beginTime) / lineDuration) * lineWidth +
-                convertRemToPixels(circleSize)
-            ).toString()
+            (((currentKeyframe.t - beginTime) / lineDuration) * lineWidth + convertRemToPixels(circleSize)).toString()
         )
 
         rect.setAttribute("rx", "5")
@@ -210,14 +255,13 @@ function updateEntitiyLine(
             "width",
             Math.max(
                 0,
-                ((entity.keyframes[keyframeIndex + 1].t - entity.keyframes[keyframeIndex].t) / lineDuration) *
-                    lineWidth -
-                    convertRemToPixels(circleSize) * 2
+                ((nextKeyframe.t - currentKeyframe.t) / lineDuration) * lineWidth - convertRemToPixels(circleSize) * 2
             ).toString()
         )
 
         rect.setAttribute("height", rem(circleSize))
 
         keyframeIndex++
+        currentSelected = nextSelected
     }
 }

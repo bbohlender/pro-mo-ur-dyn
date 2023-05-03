@@ -19,10 +19,14 @@ import Url from "./worker.js?url"
 
 const createZustand = create as any as typeof x.default
 
-export type DerivedSelectionState = { keyframes: Array<Keyframe>; astIds: Array<string>; resultIndices: Array<number> }
+export type DerivedSelectionState = {
+    keyframes: Array<Keyframe>
+    astIds: Array<string>
+    keyframeIndiciesMap: Map<number, Array<Array<Keyframe>>>
+}
 export type PrimarySelectionState = {
     astIds?: Array<string>
-    results?: Array<{ index: number; keyframeIndices: Array<number> }>
+    results?: Array<{ index: number; keyframeIndices?: Array<number> }>
 }
 
 export type AppState = {
@@ -38,6 +42,7 @@ export type AppState = {
     primarySelection: PrimarySelectionState
     derivedSelection: DerivedSelectionState
     shift: boolean
+    controlling: boolean
 }
 
 const loader = new BufferGeometryLoader()
@@ -48,6 +53,10 @@ const defaultDescription = parse(`Default (interprete: false) {
 
 export const useStore = createZustand(
     combine(createInitialState(), (set, get) => ({
+        setControlling(controlling: boolean) {
+            set({ controlling })
+        },
+
         updateDescriptions(descriptions: ParsedDescriptions, partial?: Partial<AppState>) {
             const requestedDuration = Math.max(get().time * 2, 10)
             get().workerInterface.terminate()
@@ -77,11 +86,9 @@ export const useStore = createZustand(
             for (const { astId, transformation } of edits) {
                 newTransformations[astId] = transformation
             }
-            set({
-                descriptions: {
-                    ...descriptions,
-                    transformations: newTransformations,
-                },
+            this.updateDescriptions({
+                ...descriptions,
+                transformations: newTransformations,
             })
         },
         delete(): void {
@@ -93,7 +100,7 @@ export const useStore = createZustand(
                     )
                 }
             }
-            this.updatePrimarySelection({ astIds: [], results: [] })
+            this.updateDescriptions(descriptions, { primarySelection: { astIds: [], results: [] } })
         },
         unselect(): void {
             this.updatePrimarySelection({ astIds: [], results: [] })
@@ -223,7 +230,7 @@ export const useStore = createZustand(
     }))
 )
 
-function getRawValue(transformation: ParsedTransformation): any {
+export function getRawValue(transformation: ParsedTransformation): any {
     if (transformation.type != "raw") {
         throw new Error(`unexpected type "${transformation}" of transformation`)
     }
@@ -234,31 +241,55 @@ function computeDerivedSelection(
     { astIds: astIdsSelection, results: resultsSelection }: PrimarySelectionState,
     result: any
 ): DerivedSelectionState {
-    const agents: Array<MotionEntity> = result.agents
+    const agents: Array<MotionEntity> | undefined = result.agents
     const keyframeSet = new Set<Keyframe>()
     const astIds = new Set<string>(astIdsSelection)
-    const resultIndices = new Set<number>(resultsSelection?.map(({ index }) => index))
-    for (let agentIndex = 0; agentIndex < agents.length; agentIndex++) {
-        const keyframes = agents[agentIndex].keyframes
+    const resultIndices = new Map<number, Array<Array<Keyframe>>>()
+    for (let agentIndex = 0; agentIndex < (agents?.length ?? 0); agentIndex++) {
+        const keyframes = agents![agentIndex].keyframes
         const resultSelection = resultsSelection?.filter(({ index }) => agentIndex === index)
+        let currentKeyframes: Array<Keyframe> | undefined = undefined
         for (let keyframeIndex = 0; keyframeIndex < keyframes.length; keyframeIndex++) {
             const keyframe = keyframes[keyframeIndex]
-            if (resultSelection?.find(({ keyframeIndices }) => keyframeIndices.includes(keyframeIndex)) != null) {
+            let isContained = false
+            if (
+                resultSelection?.find(
+                    ({ keyframeIndices }) => keyframeIndices == null || keyframeIndices.includes(keyframeIndex)
+                ) != null
+            ) {
                 keyframeSet.add(keyframe)
                 astIds.add(keyframe.astId)
-                continue
-            }
-            if (astIdsSelection?.includes(keyframe.astId)) {
+                isContained = true
+            } else if (astIdsSelection?.includes(keyframe.astId)) {
                 keyframeSet.add(keyframe)
-                resultIndices.add(agentIndex)
+                isContained = true
+            }
+
+            if (isContained) {
+                if (currentKeyframes == null) {
+                    currentKeyframes = []
+                    setOrAdd(resultIndices, agentIndex, currentKeyframes)
+                }
+                currentKeyframes.push(keyframe)
+            } else {
+                currentKeyframes = undefined
             }
         }
     }
     return {
         keyframes: Array.from(keyframeSet),
         astIds: Array.from(astIds),
-        resultIndices: Array.from(resultIndices),
+        keyframeIndiciesMap: resultIndices,
     }
+}
+
+function setOrAdd(map: Map<number, Array<Array<Keyframe>>>, key: number, value: Array<Keyframe>): void {
+    const entry = map.get(key)
+    if (entry == null) {
+        map.set(key, [value])
+        return
+    }
+    entry.push(value)
 }
 
 export function updateTime(delta: number) {
@@ -292,8 +323,9 @@ function createInitialState(): AppState {
         requestedDuration,
         textEdit: false,
         primarySelection: {},
-        derivedSelection: { keyframes: [], astIds: [], resultIndices: [] },
+        derivedSelection: { keyframes: [], astIds: [], keyframeIndiciesMap: new Map() },
         shift: false,
+        controlling: false,
     }
 }
 

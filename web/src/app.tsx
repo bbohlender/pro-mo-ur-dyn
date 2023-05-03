@@ -1,4 +1,4 @@
-import { Canvas } from "@react-three/fiber"
+import { Canvas, events } from "@react-three/fiber"
 import { OrbitControls } from "@react-three/drei"
 import { Interface2D } from "./components/interface-2d.js"
 import { Agents } from "./components/viewer/agents.js"
@@ -8,16 +8,18 @@ import { Suspense } from "react"
 import { useStore } from "./state/store.js"
 import { DragEvent } from "react"
 import { parse } from "pro-3d-video"
+import { useKeyboard } from "./components/use-keyboard.js"
 import { PathControl } from "./components/controls/path.js"
+import { Paths } from "./components/viewer/path.js"
 
-async function onDrop(store: typeof useStore, e: DragEvent<HTMLDivElement>) {
+async function onDrop(e: DragEvent<HTMLDivElement>) {
     e.stopPropagation()
     e.preventDefault()
     if (e.dataTransfer?.files.length === 1) {
         try {
             const text = await e.dataTransfer.files[0].text()
             const parsed = parse(text)
-            store.getState().finishTextEdit(parsed)
+            useStore.getState().finishTextEdit(parsed)
         } catch (error: any) {
             alert(error.message)
         }
@@ -25,11 +27,17 @@ async function onDrop(store: typeof useStore, e: DragEvent<HTMLDivElement>) {
 }
 
 export default function App() {
+    useKeyboard()
     return (
         <>
             <Canvas
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={onDrop.bind(null, useStore)}
+                onDrop={onDrop}
+                onPointerMissed={(e) => {
+                    if (e.buttons === 0) {
+                        useStore.getState().unselect()
+                    }
+                }}
                 shadows
                 gl={{ logarithmicDepthBuffer: true, antialias: true }}
                 camera={{ far: 10000 }}
@@ -39,10 +47,12 @@ export default function App() {
                 <Suspense>
                     <Agents />
                 </Suspense>
+                <Paths />
+                <PathControl />
                 <GeometryResult color="white" type="building" />
                 <GeometryResult position={[0, 0.05, 0]} color="white" type="footwalk" />
                 <GeometryResult color="gray" type="street" />
-                <OrbitControls />
+                <Orbit />
                 <ContactShadows
                     position={[0, -0.2, 0]}
                     rotation={[-Math.PI / 2, 0, 0]}
@@ -59,4 +69,9 @@ export default function App() {
             <Interface2D />
         </>
     )
+}
+
+function Orbit() {
+    const controlling = useStore((state) => state.controlling)
+    return <OrbitControls enabled={!controlling} />
 }

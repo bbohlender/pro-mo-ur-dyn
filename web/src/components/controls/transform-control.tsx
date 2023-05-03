@@ -2,6 +2,7 @@ import { createPortal, useThree } from "@react-three/fiber"
 import { useRef, useEffect, useMemo, useState } from "react"
 import { Camera, Group, Matrix4, Object3D, Vector3Tuple, Event } from "three"
 import { StdTransformControls } from "./std-transform-controls.js"
+import { useStore } from "../../state/store.js"
 
 export type TransformMode = "scale" | "rotate" | "translate"
 export type AxisEnabled = [boolean, boolean, boolean]
@@ -10,7 +11,6 @@ export function TransformControl({
     mode,
     set,
     value,
-    matrix,
     axis,
     child,
     length,
@@ -20,7 +20,6 @@ export function TransformControl({
     length?: number
     mode: TransformMode
     value: Vector3Tuple
-    matrix: Matrix4
     axis: AxisEnabled
     set: (x: number, y: number, z: number) => void
     child?: Object3D
@@ -48,10 +47,10 @@ export function TransformControl({
             return
         }
         const mouseDown = () => {
-            //useViewerState.getState().setControlling(true)
+            useStore.getState().setControlling(true)
         }
         const mouseUp = (e: Event) => {
-            //setTimeout(() => useViewerState.getState().setControlling(false))
+            setTimeout(() => useStore.getState().setControlling(false))
             const { x, y, z } = object[modeToPropertyMap[mode]]
             set(x, y, z)
         }
@@ -70,7 +69,7 @@ export function TransformControl({
 
     const scene = useThree((state) => state.scene)
     return (
-        <group matrixAutoUpdate={false} matrix={matrix}>
+        <group matrixAutoUpdate={false}>
             {object != null &&
                 createPortal(
                     <primitive
