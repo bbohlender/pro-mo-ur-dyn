@@ -22,6 +22,16 @@ export function Toolbar() {
             <div onClick={importBuildingsPathways} className="btn btn-outline border-slate-300 btn-sm">
                 Import Buildings & Pathways
             </div>
+            <div onClick={() => useStore.getState().deleteType("building")} className="btn btn-outline border-slate-300 btn-sm">Delete Buildings</div>
+            <div onClick={() => useStore.getState().deleteType("footwalk", "street")} className="btn btn-outline border-slate-300 btn-sm">Delete Pathways</div>
+            <div onClick={() => useStore.getState().deleteType(undefined, "agent")} className="btn btn-outline border-slate-300 btn-sm">Delete Agents</div>
+            <div
+                onClick={() => useStore.getState().enterDeriveBuildingsAndPathways()}
+                className="btn btn-outline border-slate-300 btn-sm">
+                Derive Buildings & Pathways
+            </div>
+            <div className="btn btn-outline border-slate-300 btn-sm">Derive Agents</div>
+            <div className="btn btn-outline border-slate-300 btn-sm">Concretize Agents</div>
             <div onClick={exportScene} className="btn btn-outline border-slate-300 btn-sm">
                 Export
             </div>

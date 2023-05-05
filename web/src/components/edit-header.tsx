@@ -1,7 +1,7 @@
-import { useStore } from "../../src/state/store.js"
+import { useStore } from "../state/store.js"
 import { Panel } from "./panel.js"
 
-export function Selection() {
+export function EditHeader() {
     const keyframesAmount = useStore((state) => state.derivedSelection.keyframes.length)
 
     return (
@@ -9,11 +9,11 @@ export function Selection() {
             <div className="mr-2">
                 Selected <span className="font-bold">{keyframesAmount}</span> Keyframes
             </div>
-            <div onClick={() => useStore.getState().unselect()} className="btn btn-outline border-slate-300 btn-sm">
-                Deselect
-            </div>
-            <div onClick={() => useStore.getState().delete()} className="btn btn-outline border-error btn-sm">
+            <div onClick={() => useStore.getState().deleteSelected()} className="btn btn-outline btn-error btn-sm">
                 Delete
+            </div>
+            <div onClick={() => useStore.getState().exitEdit()} className="btn btn-outline border-slate-300 btn-sm">
+                Exit
             </div>
         </Panel>
     )

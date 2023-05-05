@@ -39,7 +39,7 @@ export function Paths() {
     return <group ref={ref} />
 }
 
-function addLines(group: Group, keyframes: Array<Keyframe>) {
+export function addLines(group: Group, keyframes: Array<Keyframe>) {
     const points: Array<Vector3> = []
 
     for (let i = 1; i < keyframes.length; i++) {

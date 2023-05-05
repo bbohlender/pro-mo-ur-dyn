@@ -30,6 +30,9 @@ export type PrimarySelectionState = {
 }
 
 export type AppState = {
+    mode: "view" | "edit" | "derive" | "multi"
+    confirmDerived?: () => Promise<void>
+    deriveThreshold: number
     descriptions: ParsedDescriptions
     workerInterface: WorkerInterface
     time: number
@@ -47,6 +50,7 @@ export type AppState = {
 
 const loader = new BufferGeometryLoader()
 
+//TODO: only add when importing buildings and pathways
 const defaultDescription = parse(`Default (interprete: false) {
     Building--> this
 }`)
@@ -72,8 +76,28 @@ export const useStore = createZustand(
             set({
                 primarySelection,
                 derivedSelection: computeDerivedSelection(primarySelection, get().result),
+                mode: "edit",
                 ...partial,
             } as any)
+        },
+
+        deleteType(...types: Array<string | undefined>): void {
+            const { descriptions } = get()
+            const newDescriptions: ParsedDescriptions["descriptions"] = {}
+            for (const [id, description] of Object.entries(descriptions.descriptions)) {
+                if (
+                    description.initialVariables.interprete != false &&
+                    types.includes(description.initialVariables.type)
+                ) {
+                    continue
+                }
+                newDescriptions[id] = description
+            }
+            this.updateDescriptions({
+                transformations: descriptions.transformations,
+                nouns: descriptions.nouns,
+                descriptions: newDescriptions,
+            })
         },
 
         finishTextEdit(parsedResult: NestedDescriptions): void {
@@ -91,7 +115,7 @@ export const useStore = createZustand(
                 transformations: newTransformations,
             })
         },
-        delete(): void {
+        deleteSelected(): void {
             const { descriptions, derivedSelection } = get()
             for (const transformation of Object.values(descriptions.transformations)) {
                 if ("childrenIds" in transformation) {
@@ -102,8 +126,8 @@ export const useStore = createZustand(
             }
             this.updateDescriptions(descriptions, { primarySelection: { astIds: [], results: [] } })
         },
-        unselect(): void {
-            this.updatePrimarySelection({ astIds: [], results: [] })
+        exitEdit(): void {
+            this.updatePrimarySelection({ astIds: [], results: [] }, { mode: "view" })
         },
         concretise(): void {
             //TODO
@@ -181,6 +205,23 @@ export const useStore = createZustand(
                     }
                 )
             }
+        },
+
+        enterDeriveBuildingsAndPathways(): void {
+            set({ mode: "derive" })
+        },
+
+        setDeriveThreshold(threshold: number): void {
+            set({ deriveThreshold: threshold })
+        },
+
+        async confirmDeriveBuildingsAndPathways(): Promise<void> {
+            await get().confirmDerived?.()
+            set({ mode: "view" })
+        },
+
+        exitDeriveBuildingsAndPathways(): void {
+            set({ mode: "view" })
         },
 
         select(primarySelection: PrimarySelectionState): void {
@@ -313,8 +354,10 @@ function createInitialState(): AppState {
     const descriptions = flattenAST(defaultDescription)
     const requestedDuration = 10
     return {
+        mode: "view",
         descriptions,
         workerInterface: startWorkerInterface(descriptions, requestedDuration),
+        deriveThreshold: 0.5,
         time: 0,
         duration: 0,
         playing: true,

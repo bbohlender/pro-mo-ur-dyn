@@ -8,7 +8,7 @@ const vectorHelper = new Vector3()
 
 const MinSize = 2
 
-function addConnectionToGraph(connectionsList: Array<Array<number>>, i1: number, i2: number): void {
+function addConnectionToGraph(connectionsList: Array<Array<number> | undefined>, i1: number, i2: number): void {
     if (i1 === i2) {
         return
     }
@@ -24,7 +24,7 @@ const YUP = new Vector3(0, 1, 0)
 
 export function createGraph(pathways: Array<Pathway>, type: string, normal: Vector3 = YUP, threshold = 3): Graph {
     const points: Array<{ position: Vector3; size: number }> = []
-    const connectionsList: Array<Array<number>> = []
+    const connectionsList: Array<Array<number> | undefined> = []
     for (const pathway of pathways) {
         if (pathway.type != type) {
             continue
@@ -41,6 +41,9 @@ export function createGraph(pathways: Array<Pathway>, type: string, normal: Vect
     }
     for (let i = 0; i < connectionsList.length; i++) {
         const connections = connectionsList[i]
+        if(connections == null) {
+            continue
+        }
         const sortedAngles = connections
             .slice(1)
             .map((index) => ({

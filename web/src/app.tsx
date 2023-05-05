@@ -11,6 +11,7 @@ import { parse } from "pro-3d-video"
 import { useKeyboard } from "./components/use-keyboard.js"
 import { PathControl } from "./components/controls/path.js"
 import { Paths } from "./components/viewer/path.js"
+import { DeriveVisualization } from "./components/derive-visualization.js"
 
 async function onDrop(e: DragEvent<HTMLDivElement>) {
     e.stopPropagation()
@@ -28,6 +29,7 @@ async function onDrop(e: DragEvent<HTMLDivElement>) {
 
 export default function App() {
     useKeyboard()
+    const mode = useStore((state) => state.mode)
     return (
         <>
             <Canvas
@@ -35,7 +37,7 @@ export default function App() {
                 onDrop={onDrop}
                 onPointerMissed={(e) => {
                     if (e.buttons === 0) {
-                        useStore.getState().unselect()
+                        useStore.getState().exitEdit()
                     }
                 }}
                 shadows
@@ -53,8 +55,11 @@ export default function App() {
                 <GeometryResult position={[0, 0.05, 0]} color="white" type="footwalk" />
                 <GeometryResult color="gray" type="street" />
                 <Orbit />
+                {mode === "derive" && (
+                    <DeriveVisualization position={[0, -0.2, 0]} rotation={[-Math.PI / 2, 0, 0]} size={50} far={100} />
+                )}
                 <ContactShadows
-                    position={[0, -0.2, 0]}
+                    position={[0, -0.175, 0]}
                     rotation={[-Math.PI / 2, 0, 0]}
                     opacity={0.4}
                     width={50}

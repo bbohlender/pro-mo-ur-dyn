@@ -15,12 +15,12 @@ export function useKeyboard() {
             switch (e.key) {
                 case "Escape":
                     if (e.target == document.body) {
-                        useStore.getState().unselect()
+                        useStore.getState().exitEdit()
                     }
                     break
                 case "Delete":
                     if (e.target == document.body) {
-                        useStore.getState().delete()
+                        useStore.getState().deleteSelected()
                     }
                     break
                 case "Shift":
