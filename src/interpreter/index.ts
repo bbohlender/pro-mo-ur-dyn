@@ -148,9 +148,6 @@ export function interpreteQueueRecursive(
     publishResult: (queue: Queue, prevProgress: any, currentProgress: any, isFinal: boolean) => void
 ) {
     let nextEntry: QueueEntry | undefined = queue.peek()
-    if (nextEntry == null) {
-        return
-    }
 
     const startTime = new Date().getTime()
     const progressAtStart = queue.currentProgress

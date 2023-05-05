@@ -9,13 +9,14 @@ import {
     BackSide,
     Group,
     Mesh,
+    MeshBasicMaterial,
     OrthographicCamera,
     PlaneGeometry,
     ShaderMaterial,
     Vector2Tuple,
     WebGLRenderTarget,
 } from "three"
-import { useCallback, useEffect, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useStore } from "../state/store.js"
 import { MotionEntity } from "pro-3d-video/motion"
 import { NestedDescription, NestedTransformation } from "pro-3d-video"
@@ -39,7 +40,7 @@ export function DeriveVisualization({
     ...props
 }: Omit<JSX.IntrinsicElements["group"], "scale"> & DerivedRoadsProps) {
     const gl = useThree((state) => state.gl)
-    const shadowCamera = React.useRef<OrthographicCamera>(null!)
+    const shadowCamera = useRef<OrthographicCamera>(null)
 
     size = size * scale
 
@@ -81,14 +82,14 @@ export function DeriveVisualization({
         horizontalBlurMaterial.uniforms.h.value = (blur * 1) / 256
 
         gl.setRenderTarget(renderTargetBlur)
-        gl.render(blurPlane, shadowCamera.current)
+        gl.render(blurPlane, shadowCamera.current!)
 
         blurPlane.material = verticalBlurMaterial
         verticalBlurMaterial.uniforms.tDiffuse.value = renderTargetBlur.texture
         verticalBlurMaterial.uniforms.v.value = (blur * 1) / 256
 
         gl.setRenderTarget(renderTarget)
-        gl.render(blurPlane, shadowCamera.current)
+        gl.render(blurPlane, shadowCamera.current!)
 
         blurPlane.visible = false
     }
@@ -101,7 +102,7 @@ export function DeriveVisualization({
         thresholdMaterial.uniforms.tDiffuse.value = renderTarget.texture
 
         gl.setRenderTarget(renderTargetBlur)
-        gl.render(blurPlane, shadowCamera.current)
+        gl.render(blurPlane, shadowCamera.current!)
 
         blurPlane.visible = false
     }
@@ -144,7 +145,7 @@ export function DeriveVisualization({
 
     useEffect(() => {
         const state = useStore.getState()
-        updateTexture(state.result.agents ?? [], state.deriveThreshold)
+        setTimeout(() => updateTexture(state.result.agents ?? [], state.deriveThreshold), 0)
 
         state.confirmDerived = async () => {
             const state = useStore.getState()

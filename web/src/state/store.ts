@@ -50,11 +50,6 @@ export type AppState = {
 
 const loader = new BufferGeometryLoader()
 
-//TODO: only add when importing buildings and pathways
-const defaultDescription = parse(`Default (interprete: false) {
-    Building--> this
-}`)
-
 export const useStore = createZustand(
     combine(createInitialState(), (set, get) => ({
         setControlling(controlling: boolean) {
@@ -85,10 +80,7 @@ export const useStore = createZustand(
             const { descriptions } = get()
             const newDescriptions: ParsedDescriptions["descriptions"] = {}
             for (const [id, description] of Object.entries(descriptions.descriptions)) {
-                if (
-                    description.initialVariables.interprete != false &&
-                    types.includes(description.initialVariables.type)
-                ) {
+                if (types.includes(description.initialVariables.type)) {
                     continue
                 }
                 newDescriptions[id] = description
@@ -351,7 +343,7 @@ export function updateTime(delta: number) {
 }
 
 function createInitialState(): AppState {
-    const descriptions = flattenAST(defaultDescription)
+    const descriptions: ParsedDescriptions = { descriptions: {}, nouns: {}, transformations: {} }
     const requestedDuration = 10
     return {
         mode: "view",
@@ -376,7 +368,7 @@ function startWorkerInterface(descriptions: ParsedDescriptions, requestedDuratio
     const workerInterface = new WorkerInterface(
         Url,
         {
-            name: "worker",
+            name: generateUUID(),
             type: "module",
         },
         (result, progress, isFinal) => useStore.getState().replaceResult(result, progress, isFinal)

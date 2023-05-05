@@ -8,6 +8,7 @@ declare var openBracket: any;
 declare var closedBracket: any;
 declare var openCurlyBracket: any;
 declare var closedCurlyBracket: any;
+declare var comma: any;
 declare var colon: any;
 declare var ws: any;
 declare var longArrow: any;
@@ -31,7 +32,6 @@ declare var thisSymbol: any;
 declare var returnSymbol: any;
 declare var nullSymbol: any;
 declare var number: any;
-declare var comma: any;
 declare var point: any;
 declare var boolean: any;
 declare var string: any;
@@ -125,8 +125,9 @@ const grammar: Grammar = {
     {"name": "DescriptionDefinition$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "DescriptionDefinition", "symbols": [(lexer.has("identifier") ? {type: "identifier"} : identifier), "ws", "DescriptionDefinition$ebnf$1", (lexer.has("openCurlyBracket") ? {type: "openCurlyBracket"} : openCurlyBracket), "ws", "NounDefinitions", (lexer.has("closedCurlyBracket") ? {type: "closedCurlyBracket"} : closedCurlyBracket), "ws"], "postprocess": ([{ value: identifier },,initialVariables,,,nouns]) => [identifier, { initialVariables: initialVariables?.[2] ?? {}, nouns, rootNounIdentifier: Object.keys(nouns)[0] }]},
     {"name": "InitialVariables$ebnf$1", "symbols": []},
-    {"name": "InitialVariables$ebnf$1", "symbols": ["InitialVariables$ebnf$1", "InitialVariable"], "postprocess": (d) => d[0].concat([d[1]])},
-    {"name": "InitialVariables", "symbols": ["InitialVariables$ebnf$1"], "postprocess": ([initialVariables]) => initialVariables.reduce((prev: any, [identifier, value]: [string, any]) => { prev[identifier] = value; return prev }, {})},
+    {"name": "InitialVariables$ebnf$1$subexpression$1", "symbols": ["InitialVariable", (lexer.has("comma") ? {type: "comma"} : comma), "ws"]},
+    {"name": "InitialVariables$ebnf$1", "symbols": ["InitialVariables$ebnf$1", "InitialVariables$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "InitialVariables", "symbols": ["InitialVariables$ebnf$1", "InitialVariable"], "postprocess": ([initialVariables, initialVariable]) => [...initialVariables.map(([v]: [any]) => v), initialVariable].reduce((prev: any, [identifier, value]: [string, any]) => { prev[identifier] = value; return prev }, {})},
     {"name": "InitialVariable", "symbols": [(lexer.has("identifier") ? {type: "identifier"} : identifier), "ws", (lexer.has("colon") ? {type: "colon"} : colon), "ws", "Constant", "ws"], "postprocess": ([{ value:identifier },,,,value]) => [identifier, value]},
     {"name": "NounDefinitions$ebnf$1", "symbols": []},
     {"name": "NounDefinitions$ebnf$1$subexpression$1", "symbols": ["NounDefinition", (lexer.has("ws") ? {type: "ws"} : ws)]},

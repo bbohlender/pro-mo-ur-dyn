@@ -29,8 +29,8 @@ export class WorkerInterface {
     private worker: Worker | null = null
 
     constructor(
-        private url: URL,
-        private options: { credentials?: RequestCredentials; name?: string; type?: WorkerType },
+        url: URL,
+        options: { credentials?: RequestCredentials; name?: string; type?: WorkerType },
         private onResult: (result: any, progress: any, isFinal: boolean) => void
     ) {
         this.worker = new Worker(url, options)

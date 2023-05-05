@@ -35,7 +35,7 @@ export function TextEditor() {
                 className="text-slate-950 bg-transparent border-0 flex-basis-0 flex-grow"
             />
             {"error" in parseResult ? (
-                <ErrorMessage align="right" className="absolute bottom-3 left-3 right-3" message={parseResult.error} />
+                <ErrorMessage align="right" className="absolute bottom-5 left-5 right-5" message={parseResult.error} />
             ) : (
                 <button
                     className="btn btn-sm p-2 aspect-square btn-primary rounded-full flex items-center absolute right-5 bottom-5"

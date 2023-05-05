@@ -1,5 +1,5 @@
 import { useStore } from "../state/store.js"
-import { NestedDescriptions } from "pro-3d-video"
+import { NestedDescriptions, parse } from "pro-3d-video"
 import { Panel } from "./panel.js"
 import simplify from "simplify-js"
 import { AnimationClip, KeyframeTrack, Object3D } from "three"
@@ -22,9 +22,21 @@ export function Toolbar() {
             <div onClick={importBuildingsPathways} className="btn btn-outline border-slate-300 btn-sm">
                 Import Buildings & Pathways
             </div>
-            <div onClick={() => useStore.getState().deleteType("building")} className="btn btn-outline border-slate-300 btn-sm">Delete Buildings</div>
-            <div onClick={() => useStore.getState().deleteType("footwalk", "street")} className="btn btn-outline border-slate-300 btn-sm">Delete Pathways</div>
-            <div onClick={() => useStore.getState().deleteType(undefined, "agent")} className="btn btn-outline border-slate-300 btn-sm">Delete Agents</div>
+            <div
+                onClick={() => useStore.getState().deleteType("building")}
+                className="btn btn-outline border-slate-300 btn-sm">
+                Delete Buildings
+            </div>
+            <div
+                onClick={() => useStore.getState().deleteType("footwalk", "street")}
+                className="btn btn-outline border-slate-300 btn-sm">
+                Delete Pathways
+            </div>
+            <div
+                onClick={() => useStore.getState().deleteType(undefined, "agent")}
+                className="btn btn-outline border-slate-300 btn-sm">
+                Delete Agents
+            </div>
             <div
                 onClick={() => useStore.getState().enterDeriveBuildingsAndPathways()}
                 className="btn btn-outline border-slate-300 btn-sm">
@@ -67,9 +79,14 @@ async function exportScene() {
     a.click()
 }
 
+const defaultDescription = parse(`Default (type: "building", interprete: false) {
+    Building--> this
+}`)
+
 async function importBuildingsPathways() {
     const layers = await loadMapLayers("_18-77198-98516.mvt", 98516, 18)
     useStore.getState().addDescriptions({
+        ...defaultDescription,
         ...convertLotsToDescriptions(layers),
         Streets: convertPathwaysToDescription(layers, 10, "street", ["street", "secondary"]),
         Footwalks: convertPathwaysToDescription(layers, 3, "footwalk", ["footwalk", "path"]),
