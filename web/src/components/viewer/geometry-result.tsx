@@ -5,12 +5,14 @@ export function GeometryResult({
     type,
     color,
     position,
+    result,
 }: {
     type: string
+    result: any
     color: ColorRepresentation
     position?: Vector3Tuple
 }) {
-    const geometry = useStore((state) => state.result[type])
+    const geometry = result[type]
     if (geometry == null) {
         return null
     }

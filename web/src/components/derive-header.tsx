@@ -21,7 +21,7 @@ export function DeriveHeader() {
             </div>
 
             <div
-                onClick={() => useStore.getState().exitDeriveBuildingsAndPathways()}
+                onClick={() => useStore.getState().enterView()}
                 className="btn btn-outline btn-error btn-sm">
                 Cancel
             </div>

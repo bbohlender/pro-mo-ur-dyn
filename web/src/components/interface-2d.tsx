@@ -6,6 +6,7 @@ import { TextViewer } from "./text-viewer.js"
 import { Toolbar } from "./toolbar.js"
 import { EditHeader } from "./edit-header.js"
 import { DeriveHeader } from "./derive-header.js"
+import { MultiHeader } from "./multi-header.js"
 
 export function Interface2D() {
     const textEdit = useStore((state) => state.textEdit)
@@ -16,10 +17,11 @@ export function Interface2D() {
                 {mode === "view" && <Toolbar />}
                 {mode === "edit" && <EditHeader />}
                 {mode === "derive" && <DeriveHeader />}
-                {mode === "view" && <div className="flex-grow"/>}
+                {mode === "multi" && <MultiHeader />}
+                {mode === "view" && <div className="flex-grow" />}
                 {mode === "view" && (textEdit ? <TextEditor /> : <TextViewer />)}
             </div>
-            <ProceduralLine />
+            {mode != "multi" && <ProceduralLine />}
             <PlayerControls />
         </div>
     )

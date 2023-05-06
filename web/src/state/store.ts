@@ -32,6 +32,7 @@ export type PrimarySelectionState = {
 export type AppState = {
     mode: "view" | "edit" | "derive" | "multi"
     confirmDerived?: () => Promise<void>
+    onUpdateRequestedTimeSet: Set<(requestedTime: number) => void>
     deriveThreshold: number
     descriptions: ParsedDescriptions
     workerInterface: WorkerInterface
@@ -203,6 +204,10 @@ export const useStore = createZustand(
             set({ mode: "derive" })
         },
 
+        enterMultiScenario(): void {
+            set({ mode: "multi" })
+        },
+
         setDeriveThreshold(threshold: number): void {
             set({ deriveThreshold: threshold })
         },
@@ -212,7 +217,7 @@ export const useStore = createZustand(
             set({ mode: "view" })
         },
 
-        exitDeriveBuildingsAndPathways(): void {
+        enterView(): void {
             set({ mode: "view" })
         },
 
@@ -338,6 +343,9 @@ export function updateTime(delta: number) {
     //more than 80% of the timeline is played
     if (!state.interpretationFinished && state.time > state.requestedDuration * 0.8) {
         state.requestedDuration = state.requestedDuration * 2
+        for (const onUpdateRequestedTime of state.onUpdateRequestedTimeSet) {
+            onUpdateRequestedTime(state.requestedDuration)
+        }
         state.workerInterface.updateRequestedProgress(state.requestedDuration)
     }
 }
@@ -361,6 +369,7 @@ function createInitialState(): AppState {
         derivedSelection: { keyframes: [], astIds: [], keyframeIndiciesMap: new Map() },
         shift: false,
         controlling: false,
+        onUpdateRequestedTimeSet: new Set(),
     }
 }
 

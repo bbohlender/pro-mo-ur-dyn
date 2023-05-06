@@ -42,6 +42,11 @@ export function Toolbar() {
                 className="btn btn-outline border-slate-300 btn-sm">
                 Derive Buildings & Pathways
             </div>
+            <div
+                onClick={() => useStore.getState().enterMultiScenario()}
+                className="btn btn-outline border-slate-300 btn-sm">
+                View Scenarios
+            </div>
             <div className="btn btn-outline border-slate-300 btn-sm">Derive Agents</div>
             <div className="btn btn-outline border-slate-300 btn-sm">Concretize Agents</div>
             <div onClick={exportScene} className="btn btn-outline border-slate-300 btn-sm">

@@ -20,7 +20,7 @@ import {
     Vector3,
 } from "three"
 import { MotionEntity, getEntityPositionAt, getEntityRotationAt, getKeyframeIndex } from "pro-3d-video/motion"
-import { updateTime, useStore } from "../../state/store.js"
+import { DerivedSelectionState, PrimarySelectionState, updateTime, useStore } from "../../state/store.js"
 import { useModel } from "./use-model.js"
 import { useTexture } from "@react-three/drei"
 import shallowEqual from "zustand/shallow"
@@ -35,21 +35,35 @@ const rotationHelper = new Quaternion()
 
 const MaxAgentCount = 100
 
-export function Agents() {
-    const agentUrls = useStore(
-        (state) =>
+export function AgentsViewer({
+    result,
+    onSelect,
+    derivedSelection,
+}: {
+    derivedSelection?: DerivedSelectionState
+    result: any
+    onSelect?: (selection: PrimarySelectionState) => void
+}) {
+    const agentUrls = useMemo(
+        () =>
             Array.from(
-                (state.result.agents as Array<MotionEntity> | undefined)?.reduce((prev, entity) => {
+                (result.agents as Array<MotionEntity> | undefined)?.reduce((prev, entity) => {
                     prev.add(entity.url)
                     return prev
                 }, new Set<string>()) ?? []
             ),
-        shallowEqual as any
+        [result]
     )
     return (
         <>
             {agentUrls.map((url) => (
-                <AgentType key={url} url={url} />
+                <AgentType
+                    result={result}
+                    derivedSelection={derivedSelection}
+                    onSelect={onSelect}
+                    key={url}
+                    url={url}
+                />
             ))}
         </>
     )
@@ -67,7 +81,17 @@ const vectorHelper2 = new Vector3()
 const quaternionHelper = new Quaternion()
 const ZAXIS = new Vector3(0, 0, 1)
 
-export function AgentType({ url }: { url: string }) {
+export function AgentType({
+    result,
+    url,
+    onSelect,
+    derivedSelection,
+}: {
+    derivedSelection?: DerivedSelectionState
+    result: any
+    url: string
+    onSelect?: (selection: PrimarySelectionState) => void
+}) {
     const ref1 = useRef<InstancedMesh>(null)
     const ref2 = useRef<InstancedMesh>(null)
     //const ref3 = useRef<InstancedMesh>(null)
@@ -78,7 +102,10 @@ export function AgentType({ url }: { url: string }) {
         () => new MeshBasicMaterial({ depthWrite: false, transparent: true, map: planeTexture, toneMapped: false }),
         [planeTexture]
     )
-    const instanceColor = useMemo(() => new InstancedBufferAttribute(new Float32Array(MaxAgentCount * 3).fill(1), 3), [])
+    const instanceColor = useMemo(
+        () => new InstancedBufferAttribute(new Float32Array(MaxAgentCount * 3).fill(1), 3),
+        []
+    )
     useFrame((_, delta) => {
         if (ref1.current == null || ref2.current == null /*|| ref3.current == null*/) {
             return
@@ -86,36 +113,33 @@ export function AgentType({ url }: { url: string }) {
 
         updateTime(delta)
 
-        const {
-            result: { agents = [] },
-            derivedSelection,
-        } = useStore.getState()
-
-        const state = useStore.getState()
+        const { time } = useStore.getState()
 
         ref1.current.count = 0
         ref2.current.count = 0
         ref1.current.userData.indexMapping = []
         //ref3.current.count = 0
-        for (let resultIndex = 0; resultIndex < agents?.length ?? 0; resultIndex++) {
-            const value = agents[resultIndex]
+        for (let resultIndex = 0; resultIndex < result.agents?.length ?? 0; resultIndex++) {
+            const value = result.agents[resultIndex]
             if (value.url != url) {
                 continue
             }
-            const index = getKeyframeIndex(value.keyframes, state.time, 0)
+            const index = getKeyframeIndex(value.keyframes, time, 0)
             if (index == null) {
                 continue
             }
             ref1.current.userData.indexMapping.push(resultIndex)
-            getEntityPositionAt(value.keyframes, state.time, index, translateHelper)
-            getEntityRotationAt(value.keyframes, state.time, index, rotationHelper)
+            getEntityPositionAt(value.keyframes, time, index, translateHelper)
+            getEntityRotationAt(value.keyframes, time, index, rotationHelper)
             translateHelper.y += 0.15
             helperMatrix.compose(translateHelper, rotationHelper, scaleHelper.setScalar(2.5))
             ref1.current.setMatrixAt(ref1.current.count, helperMatrix)
-            ref1.current.setColorAt(
-                ref1.current.count,
-                derivedSelection.keyframeIndiciesMap.has(resultIndex) ? selectedColor : normalColor
-            )
+            if (derivedSelection != null) {
+                ref1.current.setColorAt(
+                    ref1.current.count,
+                    derivedSelection.keyframeIndiciesMap.has(resultIndex) ? selectedColor : normalColor
+                )
+            }
             ref2.current.setMatrixAt(ref1.current.count, helperMatrix)
             helperMatrix.compose(translateHelper, rotationHelper, scaleHelper.setScalar(value.radius))
             //ref3.current.setMatrixAt(ref1.current.count, helperMatrix)
@@ -135,7 +159,7 @@ export function AgentType({ url }: { url: string }) {
         <>
             <instancedMesh
                 onClick={(e) => {
-                    useStore.getState().select({ results: [{ index: e.object.userData.indexMapping[e.instanceId!] }] })
+                    onSelect?.({ results: [{ index: e.object.userData.indexMapping[e.instanceId!] }] })
                     e.stopPropagation()
                 }}
                 instanceColor={instanceColor}
