@@ -109,21 +109,16 @@ function Description(
     return <Component />
 }
 
-export function TextViewer() {
-    const descriptionIds = useStore((state) => Object.keys(state.descriptions.descriptions), shallow as any)
+export function TextViewer({ descriptionId }: { descriptionId: string }) {
     return (
-        <Panel
-            style={{ maxWidth: 340 }}
-            className="items-end gap-3 flex justify-between flex-col text-ui relative h-full text-slate-950 bg-transparent flex-basis-0 flex-grow">
-            <div className="flex-grow-1 overflow-y-auto">
-                <div className="m-5">
-                    {descriptionIds.map((descriptionId) => (
-                        <DescriptionViewer key={descriptionId} id={descriptionId} />
-                    ))}
+        <>
+            <div className="flex-grow-1 h-full overflow-y-auto">
+                <div className="m-3">
+                    <DescriptionViewer key={descriptionId} id={descriptionId} />
                 </div>
             </div>
 
-            <div className="flex flex-row gap-3 p-5">
+            <div className="flex flex-row justify-end gap-3 p-3">
                 <button
                     className="btn btn-sm p-2 aspect-square btn-primary rounded-full flex items-center"
                     onClick={downloadText}>
@@ -136,7 +131,7 @@ export function TextViewer() {
                     <PencilSquareIcon />
                 </button>
             </div>
-        </Panel>
+        </>
     )
 }
 

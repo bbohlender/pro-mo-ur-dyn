@@ -10,7 +10,7 @@ const xPadding = 1
 const fontSize = 1
 const circleSize = 0.8
 
-const textWidth = 5
+const textWidth = 6
 
 export function ProceduralLine() {
     const panelRef = useRef<HTMLDivElement>(null)
@@ -34,27 +34,27 @@ export function ProceduralLine() {
         return {
             createText() {
                 if (textsIndex < texts.length) {
-                    const result = texts[textsIndex++]
-                    result.setAttribute("visibility", "visible")
-                    return result
+                    const text = texts[textsIndex++]
+                    text.setAttribute("visibility", "visible")
+                    return text
                 }
-
                 const text = document.createElementNS("http://www.w3.org/2000/svg", "text")
-                svgTextRef.current!.appendChild(text)
-
                 texts.push(text)
+                svgTextRef.current!.appendChild(text)
                 return text
             },
             createTextRect() {
+                let rect: SVGRectElement
                 if (textRectsIndex < textRects.length) {
-                    const result = textRects[textRectsIndex++]
-                    result.setAttribute("visibility", "visible")
-                    return result
+                    rect = textRects[textRectsIndex++]
+                    rect.setAttribute("visibility", "visible")
+                    rect.remove()
+                } else {
+                    rect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+                    textRects.push(rect)
                 }
-                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
-                svgTextRef.current!.appendChild(rect)
+                svgTextRef.current!.prepend(rect)
 
-                textRects.push(rect)
                 return rect
             },
 
@@ -92,9 +92,13 @@ export function ProceduralLine() {
                 for (const circle of circles) {
                     circle.setAttribute("visibility", "hidden")
                 }
+                for (const textRect of textRects) {
+                    textRect.setAttribute("visibility", "hidden")
+                }
                 textsIndex = 0
                 circlesIndex = 0
                 rectsIndex = 0
+                textRectsIndex = 0
             },
         }
     }, [])
@@ -183,24 +187,27 @@ function updateEntitiyLine(
 ): void {
     const lineStartY = entityIndex * lineHeight
 
-    const text = createText()
-    text.innerHTML = "Name"
-    text.onclick = () => useStore.getState().select({ results: [{ index: entityIndex }] })
-    text.setAttribute("x", rem(xPadding))
-    text.setAttribute("y", rem(yPadding + lineStartY + fontSize))
-    text.setAttribute("fontSize", rem(fontSize))
-
     const selected = state.derivedSelection.keyframeIndiciesMap.has(entityIndex)
 
     if (selected) {
         const textBg = createTextRect()
         textBg.setAttribute("x", rem(xPadding - 0.5))
         textBg.setAttribute("y", rem(yPadding + lineStartY - 0.5))
-        textBg.setAttribute("width", rem(textWidth + 1))
+        textBg.setAttribute("width", rem(textWidth - 2 * (xPadding - 0.5)))
         textBg.setAttribute("height", rem(fontSize + 1))
         textBg.setAttribute("rx", "5")
         textBg.setAttribute("fill", "aqua")
     }
+
+    const text = createText()
+    text.innerHTML = "Name"
+    text.onclick = () => {
+        console.log("x")
+        useStore.getState().select({ results: [{ index: entityIndex }] })
+    }
+    text.setAttribute("x", rem(xPadding))
+    text.setAttribute("y", rem(yPadding + lineStartY + fontSize))
+    text.setAttribute("fontSize", rem(fontSize))
 
     const beginTime = state.time - lineDuration / 2
     const endTime = state.time + lineDuration / 2

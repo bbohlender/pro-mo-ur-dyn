@@ -1,11 +1,15 @@
 import { HTMLProps, KeyboardEvent, useEffect, useMemo, useState } from "react"
 import { useStore } from "../state/store.js"
-import { NestedDescriptions, parse, serializeString } from "pro-3d-video"
-import { CheckCircleIcon, CheckIcon, ExclamationCircleIcon } from "@heroicons/react/20/solid"
+import { NestedDescriptions, parse, serializeDescriptionString, serializeString } from "pro-3d-video"
+import { CheckIcon, ExclamationCircleIcon } from "@heroicons/react/20/solid"
 import { Panel } from "./panel.js"
 
-export function TextEditor() {
-    const [text, setText] = useState(() => serializeString(useStore.getState().descriptions))
+export function TextEditor({ descriptionId }: { descriptionId: string }) {
+    const [text, setText] = useState("")
+
+    useEffect(() => {
+        setText(serializeDescriptionString(useStore.getState().descriptions, descriptionId))
+    }, [descriptionId])
 
     useEffect(() => {
         useStore.subscribe((state, prevState) => {
@@ -24,7 +28,7 @@ export function TextEditor() {
     }, [text])
 
     return (
-        <Panel style={{ maxWidth: 340 }} className="text-ui flex-grow flex relative p-5 h-full">
+        <>
             <textarea
                 autoFocus
                 style={{ resize: "none", outline: 0, tabSize: 2 }}
@@ -32,18 +36,18 @@ export function TextEditor() {
                 spellCheck={false}
                 onKeyDown={(e) => onKeyDown(e, setText)}
                 onChange={(e) => setText(e.target.value)}
-                className="text-slate-950 bg-transparent border-0 flex-basis-0 flex-grow"
+                className="text-slate-950 w-full h-full m-3 bg-transparent border-0 flex-basis-0 flex-grow"
             />
             {"error" in parseResult ? (
                 <ErrorMessage align="right" className="absolute bottom-5 left-5 right-5" message={parseResult.error} />
             ) : (
                 <button
-                    className="btn btn-sm p-2 aspect-square btn-primary rounded-full flex items-center absolute right-5 bottom-5"
-                    onClick={() => useStore.getState().finishTextEdit(parseResult.result)}>
+                    className="btn btn-sm p-2 aspect-square btn-primary rounded-full flex items-center absolute right-3 bottom-3"
+                    onClick={() => useStore.getState().finishTextEdit(parseResult.result, descriptionId)}>
                     <CheckIcon />
                 </button>
             )}
-        </Panel>
+        </>
     )
 }
 

@@ -48,7 +48,7 @@ const lexer = moo.compile({
 
 DescriptionsDefinition  ->  ws DescriptionDefinition:*                                      {% ([, descriptions]) => descriptions.reduce((prev: any, [identifier, description]: [string, any]) => { prev[identifier] = description; return prev }, {}) %}
 
-DescriptionDefinition   ->  %identifier ws (%openBracket ws InitialVariables %closedBracket ws):? %openCurlyBracket ws NounDefinitions %closedCurlyBracket ws {% ([{ value: identifier },,initialVariables,,,nouns]) => [identifier, { initialVariables: initialVariables?.[2] ?? {}, nouns, rootNounIdentifier: Object.keys(nouns)[0] }] %}
+DescriptionDefinition   ->  %identifier ws (%openBracket ws InitialVariables:? %closedBracket ws):? %openCurlyBracket ws NounDefinitions %closedCurlyBracket ws {% ([{ value: identifier },,initialVariables,,,nouns]) => [identifier, { initialVariables: initialVariables?.[2] ?? {}, nouns, rootNounIdentifier: Object.keys(nouns)[0] }] %}
 
 InitialVariables        ->  (InitialVariable %comma ws):* InitialVariable                  {% ([initialVariables, initialVariable]) => [...initialVariables.map(([v]: [any]) => v), initialVariable].reduce((prev: any, [identifier, value]: [string, any]) => { prev[identifier] = value; return prev }, {}) %}
 InitialVariable         ->  %identifier ws %colon ws Constant ws                            {% ([{ value:identifier },,,,value]) => [identifier, value] %}

@@ -72,8 +72,8 @@ export function createDescriptionSerializeFunction<T>(
     return (descriptionId) => serializer.resolveAstEntry(descriptionId, undefined, descriptionId, 0)
 }
 
-export function serializeString(parsedDescriptions: ParsedDescriptions): string {
-    const nounStringifyFunction = createDescriptionSerializeFunction<string>(
+function createNounStringifyFunction(parsedDescriptions: ParsedDescriptions) {
+    return createDescriptionSerializeFunction<string>(
         (text) => text,
         (astId, serializeTransformation, serializeNoun, serializeDescription) => {
             switch (astId[0]) {
@@ -102,7 +102,16 @@ export function serializeString(parsedDescriptions: ParsedDescriptions): string 
         (...values) => values.join(""),
         () => " "
     )
+}
+
+export function serializeString(parsedDescriptions: ParsedDescriptions): string {
+    const nounStringifyFunction = createNounStringifyFunction(parsedDescriptions)
     return Object.keys(parsedDescriptions.descriptions).map(nounStringifyFunction).join("\n\n")
+}
+
+export function serializeDescriptionString(parsedDescriptions: ParsedDescriptions, descriptionId: string): string {
+    const nounStringifyFunction = createNounStringifyFunction(parsedDescriptions)
+    return nounStringifyFunction(descriptionId)
 }
 
 function serializeDescription<T>(

@@ -47,6 +47,7 @@ export type AppState = {
     derivedSelection: DerivedSelectionState
     shift: boolean
     controlling: boolean
+    selectedDescriptionId?: string
 }
 
 const loader = new BufferGeometryLoader()
@@ -93,8 +94,35 @@ export const useStore = createZustand(
             })
         },
 
-        finishTextEdit(parsedResult: NestedDescriptions): void {
-            this.updateDescriptions(flattenAST(parsedResult), { textEdit: false })
+        selectDescription(descriptionId: string): void {
+            set({ selectedDescriptionId: descriptionId })
+        },
+
+        finishTextEdit(parsedResult: NestedDescriptions, descriptionId?: string): void {
+            if (descriptionId == null) {
+                this.updateDescriptions(flattenAST(parsedResult), { textEdit: false })
+                return
+            }
+            Object.values(parsedResult)[0].astId = descriptionId
+            this.updateDescriptions(flattenAST({ ...nestAST(get().descriptions, true), ...parsedResult }), {
+                textEdit: false,
+            })
+        },
+
+        addDescription(): void {
+            const descriptionId = `d${generateUUID()}`
+            this.updateDescriptions(
+                flattenAST({
+                    ...nestAST(get().descriptions, true),
+                    New: {
+                        initialVariables: {},
+                        nouns: { Start: { transformation: { type: "this" } } },
+                        rootNounIdentifier: "Start",
+                        astId: descriptionId,
+                    },
+                }),
+                { selectedDescriptionId: descriptionId }
+            )
         },
 
         editTransformations(...edits: Array<{ astId: string; transformation: ParsedTransformation }>) {
