@@ -160,6 +160,9 @@ export function nestAST(
                 nouns,
                 rootNounIdentifier: rootNoun.identifier,
             }
+            if (addId) {
+                prev[identifier].astId = id
+            }
             return prev
         },
         {}

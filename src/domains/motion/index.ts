@@ -35,7 +35,7 @@ export const entityTypeDefaults = {
 
 const positionHelper = new Vector3()
 
-function distanceTo(dx: number, dy: number, dz: number) {
+export function distanceTo(dx: number, dy: number, dz: number) {
     const squared = dx * dx + dy * dy + dz * dz
     if (squared === 0) {
         return 0
@@ -183,6 +183,7 @@ export const operations: Operations = {
                     ],
                     radius: entity.radius,
                     url: entity.url,
+                    id: "",
                 }))
             )
         },
@@ -320,6 +321,7 @@ export function createMotionEntitiy({ type, x, y, z, time }: any, astId: string)
         keyframes: [{ x: x ?? 0, y: y ?? 0, z: z ?? 0, t: time ?? 0, astId, speed: defaults.speed }],
         radius: defaults.radius,
         url: defaults.url,
+        id: "",
     }
 }
 
@@ -337,6 +339,7 @@ export type MotionEntity = {
     keyframes: Array<Keyframe>
     url: string
     radius: number
+    id: string
 }
 
 export type Keyframe = {

@@ -55,7 +55,22 @@ function SingleView() {
             {mode === "edit" && <Paths />}
             {mode === "edit" && <PathControl />}
             {mode === "derive" && (
-                <DeriveVisualization position={[0, -0.2, 0]} rotation={[-Math.PI / 2, 0, 0]} size={50} far={100} />
+                <>
+                    <DeriveVisualization
+                        type="Footwalk"
+                        position={[0, -0.2, 0]}
+                        rotation={[-Math.PI / 2, 0, 0]}
+                        size={50}
+                        far={100}
+                    />
+                    <DeriveVisualization
+                        type="Street"
+                        position={[0, -0.2, 0]}
+                        rotation={[-Math.PI / 2, 0, 0]}
+                        size={50}
+                        far={100}
+                    />
+                </>
             )}
             <ResultView result={result} />
             {/*<Suspense fallback={null}>

@@ -1,21 +1,9 @@
 // The author of the original code is @mrdoob https://twitter.com/mrdoob
 // https://threejs.org/examples/?q=con#webgl_shadow_contact
 
-import * as React from "react"
-import * as THREE from "three"
-import { useFrame, useThree } from "@react-three/fiber"
+import { useThree } from "@react-three/fiber"
 import { HorizontalBlurShader, VerticalBlurShader } from "three-stdlib"
-import {
-    BackSide,
-    Group,
-    Mesh,
-    MeshBasicMaterial,
-    OrthographicCamera,
-    PlaneGeometry,
-    ShaderMaterial,
-    Vector2Tuple,
-    WebGLRenderTarget,
-} from "three"
+import { Group, Mesh, OrthographicCamera, PlaneGeometry, ShaderMaterial, Vector2Tuple, WebGLRenderTarget } from "three"
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useStore } from "../state/store.js"
 import { MotionEntity } from "pro-3d-video/motion"
@@ -29,6 +17,7 @@ export type DerivedRoadsProps = {
     far?: number
     resolution?: number
     scale?: number
+    type: "Street" | "Footwalk"
 }
 
 export function DeriveVisualization({
@@ -37,6 +26,7 @@ export function DeriveVisualization({
     far = 10,
     resolution = 2048,
     renderOrder,
+    type,
     ...props
 }: Omit<JSX.IntrinsicElements["group"], "scale"> & DerivedRoadsProps) {
     const gl = useThree((state) => state.gl)
@@ -116,7 +106,13 @@ export function DeriveVisualization({
             const group = new Group()
 
             for (const entitiy of entities) {
-                addLines(group, entitiy.keyframes)
+                const entityType =
+                    entitiy.url.includes("bus") || entitiy.url.includes("car") || entitiy.url.includes("train")
+                        ? "Street"
+                        : "Footwalk"
+                if (entityType === type) {
+                    addLines(group, entitiy.keyframes)
+                }
             }
 
             gl.setRenderTarget(renderTarget)
@@ -140,53 +136,47 @@ export function DeriveVisualization({
             }
             gl.setRenderTarget(null)
         },
-        [gl]
+        [gl, type]
     )
 
     useEffect(() => {
         const state = useStore.getState()
-        setTimeout(() => updateTexture(state.result.agents ?? [], state.deriveThreshold), 0)
+        setTimeout(() => updateTexture(state.result.agents ?? [], state[`deriveThreshold${type}`]), 0)
 
-        state.confirmDerived = async () => {
+        state[`confirmDerived${type}`] = async () => {
             const state = useStore.getState()
             const tracer = await TraceSkeleton.load()
             const bufferSize = renderTargetBlur.width * renderTargetBlur.height * 4
             const pixels = new Uint8Array(bufferSize)
-            updateTexture(state.result.agents ?? [], state.deriveThreshold, pixels)
+            updateTexture(state.result.agents ?? [], state[`deriveThreshold${type}`], pixels)
             const imageData = new ImageData(renderTargetBlur.width, renderTargetBlur.height)
             //copy texture data to Image data where format is RGBA
             for (let i = 0; i < bufferSize; i++) {
                 imageData.data[i] = pixels[i]
             }
             const polylines = tracer.fromImageData(imageData).polylines as Array<Array<Vector2Tuple>>
-            state.addDescriptions({
-                DerivedStreet: convertPathwaysToDescription(
-                    polylines,
-                    10,
-                    "street",
-                    size / renderTargetBlur.width,
-                    -size / 2
-                ),
-            })
+            return {
+                polylines,
+                ratio: size / renderTargetBlur.width,
+                offset: -size / 2,
+            }
         }
 
-        return useStore.subscribe(
-            (
-                { result: { agents }, deriveThreshold },
-                { result: { agents: prevAgents }, deriveThreshold: prevDeriveThreshold }
-            ) => {
-                if (agents != prevAgents || deriveThreshold != prevDeriveThreshold) {
-                    updateTexture(agents ?? [], deriveThreshold)
-                }
+        return useStore.subscribe((cur, prev) => {
+            if (
+                cur.result.agents != prev.result.agents ||
+                cur[`deriveThreshold${type}`] != prev[`deriveThreshold${type}`]
+            ) {
+                updateTexture(cur.result.agents ?? [], cur[`deriveThreshold${type}`])
             }
-        )
-    }, [])
+        })
+    }, [type])
 
     return (
         <group rotation-x={Math.PI / 2} {...props}>
             <mesh renderOrder={renderOrder} geometry={planeGeometry} scale={[1, -1, 1]} rotation={[-Math.PI / 2, 0, 0]}>
                 <meshBasicMaterial
-                    color="green"
+                    color={type === "Footwalk" ? "blue" : "red"}
                     transparent
                     map={renderTargetBlur.texture}
                     map-encoding={gl.outputEncoding}
@@ -195,68 +185,6 @@ export function DeriveVisualization({
             <orthographicCamera ref={shadowCamera} args={[-size / 2, size / 2, size / 2, -size / 2, 0, far]} />
         </group>
     )
-}
-export function convertPathwaysToDescription(
-    polylines: Array<Array<Vector2Tuple>>,
-    size: number,
-    type: string,
-    ratio: number,
-    offset: number
-): NestedDescription {
-    return {
-        rootNounIdentifier: "Start",
-        initialVariables: { type },
-        nouns: {
-            Start: {
-                transformation: {
-                    type: "parallel",
-                    children: polylines.map((polyline) => ({
-                        type: "sequential",
-                        children: [
-                            {
-                                type: "operation",
-                                identifier: "pathwayFrom",
-                                children: [
-                                    {
-                                        type: "raw",
-                                        value: polyline[0][0] * ratio + offset,
-                                    },
-                                    {
-                                        type: "raw",
-                                        value: polyline[0][1] * ratio + offset,
-                                    },
-                                    {
-                                        type: "raw",
-                                        value: size,
-                                    },
-                                ],
-                            },
-                            ...polyline.slice(1).map<NestedTransformation>(([x, y], i) => {
-                                return {
-                                    type: "operation",
-                                    identifier: "pathwayTo",
-                                    children: [
-                                        {
-                                            type: "raw",
-                                            value: x * ratio + offset,
-                                        },
-                                        {
-                                            type: "raw",
-                                            value: y * ratio + offset,
-                                        },
-                                        {
-                                            type: "raw",
-                                            value: size,
-                                        },
-                                    ],
-                                }
-                            }),
-                        ],
-                    })),
-                },
-            },
-        },
-    }
 }
 
 const ThresholdShader = {

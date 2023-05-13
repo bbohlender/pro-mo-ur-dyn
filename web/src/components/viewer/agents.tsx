@@ -119,35 +119,36 @@ export function AgentType({
         ref2.current.count = 0
         ref1.current.userData.indexMapping = []
         //ref3.current.count = 0
-        for (let resultIndex = 0; resultIndex < result.agents?.length ?? 0; resultIndex++) {
-            const value = result.agents[resultIndex]
-            if (value.url != url) {
-                continue
-            }
-            const index = getKeyframeIndex(value.keyframes, time, 0)
-            if (index == null) {
-                continue
-            }
-            ref1.current.userData.indexMapping.push(resultIndex)
-            getEntityPositionAt(value.keyframes, time, index, translateHelper)
-            getEntityRotationAt(value.keyframes, time, index, rotationHelper)
-            translateHelper.y += 0.15
-            helperMatrix.compose(translateHelper, rotationHelper, scaleHelper.setScalar(2.5))
-            ref1.current.setMatrixAt(ref1.current.count, helperMatrix)
-            if (derivedSelection != null) {
-                ref1.current.setColorAt(
-                    ref1.current.count,
-                    derivedSelection.keyframeIndiciesMap.has(resultIndex) ? selectedColor : normalColor
-                )
-            }
-            ref2.current.setMatrixAt(ref1.current.count, helperMatrix)
-            helperMatrix.compose(translateHelper, rotationHelper, scaleHelper.setScalar(value.radius))
-            //ref3.current.setMatrixAt(ref1.current.count, helperMatrix)
-            ref1.current.count++
-            ref2.current.count++
-            //ref3.current.count++
-            if (ref1.current.count === MaxAgentCount) {
-                break
+        if (result.agents != null) {
+            for (const agent of result.agents as Array<MotionEntity>) {
+                if (agent.url != url) {
+                    continue
+                }
+                const index = getKeyframeIndex(agent.keyframes, time, 0)
+                if (index == null) {
+                    continue
+                }
+                ref1.current.userData.indexMapping.push(agent.id)
+                getEntityPositionAt(agent.keyframes, time, index, translateHelper)
+                getEntityRotationAt(agent.keyframes, time, index, rotationHelper)
+                translateHelper.y += 0.15
+                helperMatrix.compose(translateHelper, rotationHelper, scaleHelper.setScalar(2.5))
+                ref1.current.setMatrixAt(ref1.current.count, helperMatrix)
+                if (derivedSelection != null) {
+                    ref1.current.setColorAt(
+                        ref1.current.count,
+                        derivedSelection.keyframeIndiciesMap.has(agent.id) ? selectedColor : normalColor
+                    )
+                }
+                ref2.current.setMatrixAt(ref1.current.count, helperMatrix)
+                helperMatrix.compose(translateHelper, rotationHelper, scaleHelper.setScalar(agent.radius))
+                //ref3.current.setMatrixAt(ref1.current.count, helperMatrix)
+                ref1.current.count++
+                ref2.current.count++
+                //ref3.current.count++
+                if (ref1.current.count === MaxAgentCount) {
+                    break
+                }
             }
         }
         ref1.current.instanceMatrix.needsUpdate = true
@@ -159,7 +160,7 @@ export function AgentType({
         <>
             <instancedMesh
                 onClick={(e) => {
-                    onSelect?.({ results: [{ index: e.object.userData.indexMapping[e.instanceId!] }] })
+                    onSelect?.({ results: [{ id: e.object.userData.indexMapping[e.instanceId!] }] })
                     e.stopPropagation()
                 }}
                 instanceColor={instanceColor}

@@ -85,6 +85,7 @@ export function interprete(
                 raw: options.createValue(initialVariables, noun.astId!),
                 variables: { ...initialVariables, index: 0 },
             },
+            id: i.toString(),
             stack: [noun.transformation],
         })
     }
@@ -117,6 +118,7 @@ function nextQueued(
                         index,
                     },
                 },
+                id: `${currentEntry.id}${index}`,
                 stack: [...newTransformations, ...currentEntry.stack],
             })
         }
@@ -172,6 +174,7 @@ export function interpreteQueueRecursive(
                         raw: options.cloneValue(nextEntry.value.raw),
                         variables: { ...nextEntry.value.variables, index },
                     },
+                    id: `${nextEntry.id}${index}`,
                     stack: [nextTransformation, ...nextEntry.stack],
                 })
             }

@@ -8,7 +8,8 @@ import { EditHeader } from "./edit-header.js"
 import { DeriveHeader } from "./derive-header.js"
 import { MultiHeader } from "./multi-header.js"
 import { Panel } from "./panel.js"
-import { PlusIcon } from "@heroicons/react/20/solid"
+import { ArrowDownIcon, PlusIcon } from "@heroicons/react/20/solid"
+import { serializeString } from "pro-3d-video"
 
 export function Interface2D() {
     const mode = useStore((state) => state.mode)
@@ -42,12 +43,7 @@ function Text() {
             style={{ maxWidth: 340, minWidth: 340 }}
             className="items-end flex justify-between items-stretch flex-col text-ui relative h-full text-slate-950 bg-transparent flex-basis-0 flex-grow">
             <div className="flex flex-row border-b-2 w-full max-w-full items-center pt-1 pl-2">
-                <div
-                    onClick={() => useStore.getState().addDescription()}
-                    className="btn btn-circle btn-primary btn-xs m-1 mr-2">
-                    <PlusIcon />
-                </div>
-                <div className="flex-row items-end flex-grow h-full overflow-x-auto flex max-w-full flex-shrink-0">
+                <div className="flex-row items-end flex-grow h-full overflow-x-auto flex">
                     {Object.entries(descriptions).map(([descriptionId, { identifier }]) => (
                         <a
                             key={descriptionId}
@@ -58,6 +54,14 @@ function Text() {
                             {identifier}
                         </a>
                     ))}
+                </div>
+                <div className="btn-group my-1 mx-3 flex-shrink-0">
+                    <button className="btn btn-primary btn-xs" onClick={downloadText}>
+                        <ArrowDownIcon height={16} />
+                    </button>
+                    <div onClick={() => useStore.getState().addDescription()} className="btn btn-primary btn-xs">
+                        <PlusIcon height={20} />
+                    </div>
                 </div>
             </div>
             {selectedDescriptionId != null ? (
@@ -71,4 +75,13 @@ function Text() {
             )}
         </Panel>
     )
+}
+
+async function downloadText() {
+    const text = serializeString(useStore.getState().descriptions)
+
+    const a = document.createElement("a")
+    a.href = window.URL.createObjectURL(new Blob([text], { type: "text/plain" }))
+    a.download = `scene.cgv`
+    a.click()
 }

@@ -9,6 +9,9 @@ export function EditHeader() {
             <div className="mr-2">
                 Selected <span className="font-bold">{keyframesAmount}</span> Keyframes
             </div>
+            <div onClick={() => useStore.getState().concretize()} className="btn btn-outline btn-primary btn-sm">
+                Concretize
+            </div>
             <div onClick={() => useStore.getState().deleteSelected()} className="btn btn-outline btn-error btn-sm">
                 Delete
             </div>

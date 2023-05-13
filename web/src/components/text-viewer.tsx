@@ -121,27 +121,12 @@ export function TextViewer({ descriptionId }: { descriptionId: string }) {
             <div className="flex flex-row justify-end gap-3 p-3">
                 <button
                     className="btn btn-sm p-2 aspect-square btn-primary rounded-full flex items-center"
-                    onClick={downloadText}>
-                    <ArrowDownIcon />
-                </button>
-
-                <button
-                    className="btn btn-sm p-2 aspect-square btn-primary rounded-full flex items-center"
                     onClick={useStore.getState().beginTextEdit}>
                     <PencilSquareIcon />
                 </button>
             </div>
         </>
     )
-}
-
-async function downloadText() {
-    const text = serializeString(useStore.getState().descriptions)
-
-    const a = document.createElement("a")
-    a.href = window.URL.createObjectURL(new Blob([text], { type: "text/plain" }))
-    a.download = `scene.cgv`
-    a.click()
 }
 
 function DescriptionViewer({ id }: { id: string }) {

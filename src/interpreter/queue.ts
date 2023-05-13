@@ -7,6 +7,7 @@ export type QueueEntry = {
      * list of transformation that still needs to be executed, next transformation that should be executed is at stack[0]
      */
     stack: Array<NestedTransformation>
+    id: string
 }
 
 export class Queue {
@@ -15,7 +16,7 @@ export class Queue {
      */
     public readonly list: Array<QueueEntry> = []
 
-    public readonly results: Array<Value> = []
+    public readonly results: Array<{ raw: any; id: string }> = []
 
     private highestFinishedProgress: unknown | undefined
 
@@ -23,7 +24,7 @@ export class Queue {
 
     private readonly resultCache: { [Key in string]: any } = {}
 
-    public getCached<T>(key: string, fn: (results: Array<Value>) => T): T {
+    public getCached<T>(key: string, fn: (results: Array<{ raw: any; id: string }>) => T): T {
         if (key in this.resultCache) {
             return this.resultCache[key]
         }
@@ -61,7 +62,7 @@ export class Queue {
     push(entry: QueueEntry): void {
         const entryProgress = this.computeProgress(entry.value.raw)
         if (entry.stack.length === 0) {
-            this.results.push(entry.value)
+            this.results.push({ raw: entry.value.raw, id: entry.id })
             if (
                 this.highestFinishedProgress == null ||
                 this.compareProgress(entryProgress, this.highestFinishedProgress) < 0

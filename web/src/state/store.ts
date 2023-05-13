@@ -2,18 +2,22 @@ import {
     ParsedDescriptions,
     flattenAST,
     NestedDescriptions,
-    parse,
     nestAST,
     WorkerInterface,
     ParsedTransformation,
+    traverseUpParsed,
+    NestedTransformation,
+    ParsedRaw,
+    traverseDownNestedDescription,
+    NestedDescription,
 } from "pro-3d-video"
-import { Keyframe, MotionEntity } from "pro-3d-video/motion"
+import { Keyframe, MotionEntity, distanceTo } from "pro-3d-video/motion"
 //@ts-ignore
 import create from "zustand"
 import type x from "zustand"
 import { combine } from "zustand/middleware"
 import { clamp, generateUUID } from "three/src/math/MathUtils.js"
-import { BufferGeometryLoader } from "three"
+import { BufferGeometryLoader, Vector2Tuple } from "three"
 //@ts-ignore
 import Url from "./worker.js?url"
 
@@ -22,18 +26,28 @@ const createZustand = create as any as typeof x.default
 export type DerivedSelectionState = {
     keyframes: Array<Keyframe>
     astIds: Array<string>
-    keyframeIndiciesMap: Map<number, Array<Array<Keyframe>>>
+    keyframeIndiciesMap: Map<string, Array<Array<Keyframe>>>
 }
 export type PrimarySelectionState = {
     astIds?: Array<string>
-    results?: Array<{ index: number; keyframeIndices?: Array<number> }>
+    results?: Array<{ id: string; keyframeIndices?: Array<number> }>
 }
 
 export type AppState = {
     mode: "view" | "edit" | "derive" | "multi"
-    confirmDerived?: () => Promise<void>
+    confirmDerivedStreet?: () => Promise<{
+        polylines: Array<Array<Vector2Tuple>>
+        ratio: number
+        offset: number
+    }>
+    confirmDerivedFootwalk?: () => Promise<{
+        polylines: Array<Array<Vector2Tuple>>
+        ratio: number
+        offset: number
+    }>
     onUpdateRequestedTimeSet: Set<(requestedTime: number) => void>
-    deriveThreshold: number
+    deriveThresholdFootwalk: number
+    deriveThresholdStreet: number
     descriptions: ParsedDescriptions
     workerInterface: WorkerInterface
     time: number
@@ -150,8 +164,139 @@ export const useStore = createZustand(
         exitEdit(): void {
             this.updatePrimarySelection({ astIds: [], results: [] }, { mode: "view" })
         },
-        concretise(): void {
-            //TODO
+        concretize(): void {
+            const { derivedSelection, result, descriptions } = get()
+            if (result.agents == null) {
+                return
+            }
+            const descriptionIdentifierToAstIdMap = new Map<string, Array<string>>()
+            for (const astId of derivedSelection.astIds) {
+                traverseUpParsed(
+                    descriptions,
+                    astId,
+                    () => {
+                        //nothing
+                    },
+                    () => {
+                        //nothing
+                    },
+                    (id, description) => {
+                        let entry = descriptionIdentifierToAstIdMap.get(description.identifier)
+                        if (entry == null) {
+                            descriptionIdentifierToAstIdMap.set(description.identifier, (entry = []))
+                        }
+                        entry.push(astId)
+                    }
+                )
+            }
+
+            const newDescriptions = nestAST(descriptions, true)
+            for (const [descriptionIdentifier, astIds] of descriptionIdentifierToAstIdMap) {
+                const agents = (result.agents as Array<MotionEntity>).filter(
+                    (agent) => agent.keyframes.find((keyframe) => astIds.includes(keyframe.astId)) != null
+                )
+                const oldContent = newDescriptions[descriptionIdentifier]
+                for (let i = 0; i < agents.length; i++) {
+                    const nameFunction =
+                        agents.length === 1
+                            ? (name: string | undefined) => name
+                            : (name: string | undefined) => (name == null ? undefined : `${name}${i}`)
+                    const newDescription = structuredClone(oldContent)
+                    for (const astId of astIds) {
+                        const agent = agents[i]
+                        if (agent.keyframes[0].astId === astId) {
+                            newDescription.initialVariables.x = agent.keyframes[0].x
+                            newDescription.initialVariables.y = agent.keyframes[0].y
+                            newDescription.initialVariables.z = agent.keyframes[0].z
+                            if (agent.keyframes[0].t != 0) {
+                                newDescription.initialVariables.time = agent.keyframes[0].t
+                            }
+                        }
+                        const replacement: NestedTransformation = {
+                            type: "sequential",
+                            children: [],
+                            astId,
+                        }
+                        let keyframeIndex = 1
+                        while (
+                            keyframeIndex < agent.keyframes.length &&
+                            agent.keyframes[keyframeIndex].astId != astId
+                        ) {
+                            keyframeIndex++
+                        }
+                        while (
+                            keyframeIndex < agent.keyframes.length &&
+                            agent.keyframes[keyframeIndex].astId === astId
+                        ) {
+                            const keyframe = agent.keyframes[keyframeIndex]
+                            const prevKeyframe = agent.keyframes[keyframeIndex - 1]
+                            const distanceToPrev = distanceTo(
+                                prevKeyframe.x - keyframe.x,
+                                prevKeyframe.y - keyframe.y,
+                                prevKeyframe.z - keyframe.z
+                            )
+                            if (distanceToPrev < 0.01) {
+                                replacement.children.push({
+                                    type: "operation",
+                                    identifier: "wait",
+                                    children: [
+                                        {
+                                            type: "raw",
+                                            value: keyframe.t - prevKeyframe.t,
+                                        },
+                                    ],
+                                })
+                            } else {
+                                replacement.children.push({
+                                    type: "operation",
+                                    identifier: "moveTo",
+                                    children: [keyframe.x, keyframe.y, keyframe.z].map((value) => ({
+                                        type: "raw",
+                                        value,
+                                    })),
+                                })
+                            }
+                            keyframeIndex++
+                        }
+                        traverseDownNestedDescription(
+                            newDescription,
+                            (t) => {
+                                if (t.astId === astId) {
+                                    return replacement
+                                }
+                                return t
+                            },
+                            (n) => n,
+                            (d) => d
+                        )
+                    }
+                    traverseDownNestedDescription(
+                        newDescription,
+                        (t) => {
+                            t.astId = nameFunction(t.astId)
+                            if (t.type === "nounReference" && t.descriptionIdentifier === descriptionIdentifier) {
+                                t.descriptionIdentifier = nameFunction(t.descriptionIdentifier)!
+                            }
+                            return t
+                        },
+                        (n) => {
+                            n.astId = nameFunction(n.astId)
+                            return n
+                        },
+                        (d) => {
+                            d.astId = nameFunction(d.astId)
+                            return d
+                        }
+                    )
+                    newDescriptions[nameFunction(descriptionIdentifier)!] = newDescription
+                }
+            }
+
+            for (const descriptionIdentifier of descriptionIdentifierToAstIdMap.keys()) {
+                delete newDescriptions[descriptionIdentifier]
+            }
+
+            this.updateDescriptions(flattenAST(newDescriptions))
         },
         split(fromAstId: string, toAstId: string, percentage: number): void {
             const {
@@ -236,13 +381,41 @@ export const useStore = createZustand(
             set({ mode: "multi" })
         },
 
-        setDeriveThreshold(threshold: number): void {
-            set({ deriveThreshold: threshold })
+        setDeriveThresholdFootwalk(threshold: number): void {
+            set({ deriveThresholdFootwalk: threshold })
+        },
+
+        setDeriveThresholdStreet(threshold: number): void {
+            set({ deriveThresholdStreet: threshold })
         },
 
         async confirmDeriveBuildingsAndPathways(): Promise<void> {
-            await get().confirmDerived?.()
-            set({ mode: "view" })
+            const footwalkResult = await get().confirmDerivedFootwalk?.()
+            const streetResult = await get().confirmDerivedStreet?.()
+
+            if (footwalkResult == null || streetResult == null) {
+                return
+            }
+
+            this.addDescriptions(
+                {
+                    DerivedFootwalk: convertPathwaysToDescription(
+                        footwalkResult.polylines,
+                        3,
+                        "footwalk",
+                        footwalkResult.ratio,
+                        footwalkResult.offset
+                    ),
+                    DerivedStreet: convertPathwaysToDescription(
+                        streetResult.polylines,
+                        10,
+                        "street",
+                        streetResult.ratio,
+                        streetResult.offset
+                    ),
+                },
+                { mode: "view" }
+            )
         },
 
         enterView(): void {
@@ -286,8 +459,11 @@ export const useStore = createZustand(
 
         //TODOv2: appendResult(results: Array<Value>) {},
 
-        addDescriptions(nestedDescriptions: NestedDescriptions) {
-            this.updateDescriptions(flattenAST({ ...nestedDescriptions, ...nestAST(get().descriptions, true) }))
+        addDescriptions(nestedDescriptions: NestedDescriptions, partial?: Partial<AppState>) {
+            this.updateDescriptions(
+                flattenAST({ ...nestedDescriptions, ...nestAST(get().descriptions, true) }),
+                partial
+            )
         },
 
         setTime(time: number) {
@@ -295,6 +471,69 @@ export const useStore = createZustand(
         },
     }))
 )
+
+export function convertPathwaysToDescription(
+    polylines: Array<Array<Vector2Tuple>>,
+    size: number,
+    type: string,
+    ratio: number,
+    offset: number
+): NestedDescription {
+    return {
+        rootNounIdentifier: "Start",
+        initialVariables: { type },
+        nouns: {
+            Start: {
+                transformation: {
+                    type: "parallel",
+                    children: polylines.map((polyline) => ({
+                        type: "sequential",
+                        children: [
+                            {
+                                type: "operation",
+                                identifier: "pathwayFrom",
+                                children: [
+                                    {
+                                        type: "raw",
+                                        value: polyline[0][0] * ratio + offset,
+                                    },
+                                    {
+                                        type: "raw",
+                                        value: polyline[0][1] * ratio + offset,
+                                    },
+                                    {
+                                        type: "raw",
+                                        value: size,
+                                    },
+                                ],
+                            },
+                            ...polyline.slice(1).map<NestedTransformation>(([x, y], i) => {
+                                return {
+                                    type: "operation",
+                                    identifier: "pathwayTo",
+                                    children: [
+                                        {
+                                            type: "raw",
+                                            value: x * ratio + offset,
+                                        },
+                                        {
+                                            type: "raw",
+                                            value: y * ratio + offset,
+                                        },
+                                        {
+                                            type: "raw",
+                                            value: size,
+                                        },
+                                    ],
+                                }
+                            }),
+                        ],
+                    })),
+                },
+            },
+        },
+    }
+}
 
 export function getRawValue(transformation: ParsedTransformation): any {
     if (transformation.type != "raw") {
@@ -310,35 +549,37 @@ function computeDerivedSelection(
     const agents: Array<MotionEntity> | undefined = result.agents
     const keyframeSet = new Set<Keyframe>()
     const astIds = new Set<string>(astIdsSelection)
-    const resultIndices = new Map<number, Array<Array<Keyframe>>>()
-    for (let agentIndex = 0; agentIndex < (agents?.length ?? 0); agentIndex++) {
-        const keyframes = agents![agentIndex].keyframes
-        const resultSelection = resultsSelection?.filter(({ index }) => agentIndex === index)
-        let currentKeyframes: Array<Keyframe> | undefined = undefined
-        for (let keyframeIndex = 0; keyframeIndex < keyframes.length; keyframeIndex++) {
-            const keyframe = keyframes[keyframeIndex]
-            let isContained = false
-            if (
-                resultSelection?.find(
-                    ({ keyframeIndices }) => keyframeIndices == null || keyframeIndices.includes(keyframeIndex)
-                ) != null
-            ) {
-                keyframeSet.add(keyframe)
-                astIds.add(keyframe.astId)
-                isContained = true
-            } else if (astIdsSelection?.includes(keyframe.astId)) {
-                keyframeSet.add(keyframe)
-                isContained = true
-            }
-
-            if (isContained) {
-                if (currentKeyframes == null) {
-                    currentKeyframes = []
-                    setOrAdd(resultIndices, agentIndex, currentKeyframes)
+    const resultIndices = new Map<string, Array<Array<Keyframe>>>()
+    if (agents != null) {
+        for (const agent of agents) {
+            const keyframes = agent.keyframes
+            const resultSelection = resultsSelection?.filter(({ id }) => agent.id === id)
+            let currentKeyframes: Array<Keyframe> | undefined = undefined
+            for (let keyframeIndex = 0; keyframeIndex < keyframes.length; keyframeIndex++) {
+                const keyframe = keyframes[keyframeIndex]
+                let isContained = false
+                if (
+                    resultSelection?.find(
+                        ({ keyframeIndices }) => keyframeIndices == null || keyframeIndices.includes(keyframeIndex)
+                    ) != null
+                ) {
+                    keyframeSet.add(keyframe)
+                    astIds.add(keyframe.astId)
+                    isContained = true
+                } else if (astIdsSelection?.includes(keyframe.astId)) {
+                    keyframeSet.add(keyframe)
+                    isContained = true
                 }
-                currentKeyframes.push(keyframe)
-            } else {
-                currentKeyframes = undefined
+
+                if (isContained) {
+                    if (currentKeyframes == null) {
+                        currentKeyframes = []
+                        setOrAdd(resultIndices, agent.id, currentKeyframes)
+                    }
+                    currentKeyframes.push(keyframe)
+                } else {
+                    currentKeyframes = undefined
+                }
             }
         }
     }
@@ -349,7 +590,7 @@ function computeDerivedSelection(
     }
 }
 
-function setOrAdd(map: Map<number, Array<Array<Keyframe>>>, key: number, value: Array<Keyframe>): void {
+function setOrAdd(map: Map<string, Array<Array<Keyframe>>>, key: string, value: Array<Keyframe>): void {
     const entry = map.get(key)
     if (entry == null) {
         map.set(key, [value])
@@ -385,7 +626,8 @@ function createInitialState(): AppState {
         mode: "view",
         descriptions,
         workerInterface: startWorkerInterface(descriptions, requestedDuration),
-        deriveThreshold: 0.5,
+        deriveThresholdFootwalk: 0.5,
+        deriveThresholdStreet: 0.5,
         time: 0,
         duration: 0,
         playing: true,

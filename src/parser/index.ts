@@ -33,6 +33,92 @@ function setDescriptionIdentifier(transformation: NestedTransformation, identifi
     }
 }
 
+/*function traverseDown(description: ParsedDescriptions, astId: string, onTransformation: () => void): void {
+    switch (astId[0]) {
+        case "t":
+            description.transformations[astId]
+    }
+}*/
+
+export function traverseDownNestedDescription(
+    description: NestedDescription,
+    onTransformation: (transformation: NestedTransformation) => NestedTransformation,
+    onNoun: (noun: NestedNoun) => NestedNoun,
+    onDescription: (description: NestedDescription) => NestedDescription
+): NestedDescription {
+    const result = onDescription(description)
+    for (const [identifier, noun] of Object.entries(description.nouns)) {
+        description.nouns[identifier] = traverseDownNestedNoun(noun, onTransformation, onNoun)
+    }
+    return result
+}
+
+export function traverseDownNestedNoun(
+    noun: NestedNoun,
+    onTransformation: (transformation: NestedTransformation) => NestedTransformation,
+    onNoun: (noun: NestedNoun) => NestedNoun
+): NestedNoun {
+    const result = onNoun(noun)
+    noun.transformation = traverseDownNestedTransformation(noun.transformation, onTransformation)
+    return result
+}
+
+export function traverseDownNestedTransformation(
+    transformation: NestedTransformation,
+    onTransformation: (transformation: NestedTransformation) => NestedTransformation
+): NestedTransformation {
+    const result = onTransformation(transformation)
+    if (!("children" in transformation)) {
+        return transformation
+    }
+    for (let i = 0; i < transformation.children.length; i++) {
+        transformation.children[i] = traverseDownNestedTransformation(transformation.children[i], onTransformation)
+    }
+    return result
+}
+
+export function traverseUpParsed(
+    descriptions: ParsedDescriptions,
+    astId: string,
+    onTransformation: (id: string, transformation: ParsedTransformation) => void,
+    onNoun: (id: string, noun: ParsedNoun) => void,
+    onDescription: (id: string, description: ParsedDescription) => void,
+    visited = new Set<string>()
+): void {
+    if (visited.has(astId)) {
+        return
+    }
+    visited.add(astId)
+    const nounReferenceTuple = Object.entries(descriptions.transformations).find(
+        ([, transformation]) => transformation.type === "nounReference" && transformation.nounId === astId
+    )
+    if (nounReferenceTuple != null) {
+        onTransformation(...nounReferenceTuple)
+        traverseUpParsed(descriptions, nounReferenceTuple[0], onTransformation, onNoun, onDescription, visited)
+    }
+
+    const transformationTuple = Object.entries(descriptions.transformations).find(
+        ([, transformation]) => "childrenIds" in transformation && transformation.childrenIds.includes(astId)
+    )
+    if (transformationTuple != null) {
+        onTransformation(...transformationTuple)
+        traverseUpParsed(descriptions, transformationTuple[0], onTransformation, onNoun, onDescription, visited)
+    }
+
+    const nounTuple = Object.entries(descriptions.nouns).find(([, noun]) => noun.tansformationId === astId)
+    if (nounTuple != null) {
+        onNoun(...nounTuple)
+        traverseUpParsed(descriptions, nounTuple[0], onTransformation, onNoun, onDescription, visited)
+    }
+
+    const descriptionTuple = Object.entries(descriptions.descriptions).find(
+        ([, description]) => description.rootNounId === astId
+    )
+    if (descriptionTuple != null) {
+        onDescription(...descriptionTuple)
+    }
+}
+
 export type ParsedTransformation =
     | ParsedParallel
     | ParsedSequantial

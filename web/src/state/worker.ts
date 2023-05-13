@@ -7,13 +7,7 @@ import {
     Primitive,
     primitivesToGeometry,
 } from "pro-3d-video/building"
-import {
-    operations as motionOperations,
-    compareMotionEntityPriority,
-    getMotionEntityProgress,
-    isMotionEntity,
-    createMotionEntitiy,
-} from "pro-3d-video/motion"
+import { operations as motionOperations, isMotionEntity, createMotionEntitiy, MotionEntity } from "pro-3d-video/motion"
 import { isPathway, Pathway, operations as pathwayOperations, pathwaysToGeometry } from "pro-3d-video/pathway"
 import { BufferGeometryLoader, Matrix4 } from "three"
 
@@ -62,7 +56,22 @@ initializeWorker({
         return currentProgress - startProgress > 3 //3 seconds computed
     },
     serialize(queue, prevProgress, currentProgress) {
-        const all = queue.list.map(({ value: { raw } }) => raw).concat(queue.results.map(({ raw }) => raw))
+        const agents: Array<MotionEntity> = []
+        for (const entry of queue.list) {
+            if (!isMotionEntity(entry.value.raw)) {
+                continue
+            }
+            entry.value.raw.id = entry.id
+            agents.push(entry.value.raw)
+        }
+        for (const entry of queue.results) {
+            if (!isMotionEntity(entry.raw)) {
+                continue
+            }
+            entry.raw.id = entry.id
+            agents.push(entry.raw)
+        }
+
         return {
             building: queue
                 .getCached("building", (results) =>
@@ -79,7 +88,7 @@ initializeWorker({
                     pathwaysToGeometry(results.map(({ raw }) => raw).filter(isPathway), "footwalk")
                 )
                 ?.toJSON(),
-            agents: all.filter(isMotionEntity),
+            agents,
         }
         /*return values.map((value) => {
             /*if (isMotionEntity(value.raw)) {

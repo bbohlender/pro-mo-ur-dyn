@@ -135,8 +135,8 @@ export function ProceduralLine() {
                 updateEntitiyLine(
                     state,
                     svgLinesRef.current!.getBoundingClientRect().width,
-                    agents,
                     i,
+                    agents[i],
                     functions.createText,
                     functions.createTextRect,
                     functions.createCircle,
@@ -178,8 +178,8 @@ const lineDuration = 10
 function updateEntitiyLine(
     state: AppState,
     lineWidth: number,
-    entities: Array<MotionEntity>,
     entityIndex: number,
+    entity: MotionEntity,
     createText: () => SVGTextElement,
     createTextRect: () => SVGRectElement,
     createCircle: () => SVGCircleElement,
@@ -187,7 +187,7 @@ function updateEntitiyLine(
 ): void {
     const lineStartY = entityIndex * lineHeight
 
-    const selected = state.derivedSelection.keyframeIndiciesMap.has(entityIndex)
+    const selected = state.derivedSelection.keyframeIndiciesMap.has(entity.id)
 
     if (selected) {
         const textBg = createTextRect()
@@ -203,7 +203,7 @@ function updateEntitiyLine(
     text.innerHTML = "Name"
     text.onclick = () => {
         console.log("x")
-        useStore.getState().select({ results: [{ index: entityIndex }] })
+        useStore.getState().select({ results: [{ id: entity.id }] })
     }
     text.setAttribute("x", rem(xPadding))
     text.setAttribute("y", rem(yPadding + lineStartY + fontSize))
@@ -212,7 +212,6 @@ function updateEntitiyLine(
     const beginTime = state.time - lineDuration / 2
     const endTime = state.time + lineDuration / 2
 
-    const entity = entities[entityIndex]
     let keyframeIndex = 0
     const t = Math.max(0, beginTime)
     while (keyframeIndex + 1 < entity.keyframes.length && entity.keyframes[keyframeIndex + 1].t < t) {
@@ -234,7 +233,7 @@ function updateEntitiyLine(
         const i = keyframeIndex
         circle.onclick = () => {
             useStore.getState().select({
-                results: [{ index: entityIndex, keyframeIndices: [i] }],
+                results: [{ id: entity.id, keyframeIndices: [i] }],
             })
         }
 
@@ -247,7 +246,7 @@ function updateEntitiyLine(
 
         rect.onclick = () =>
             useStore.getState().select({
-                results: [{ index: entityIndex, keyframeIndices: [i, i + 1] }],
+                results: [{ id: entity.id, keyframeIndices: [i, i + 1] }],
             })
 
         rect.setAttribute("fill", currentSelected && nextSelected ? "aqua" : "gray")
