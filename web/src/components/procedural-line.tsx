@@ -200,7 +200,7 @@ function updateEntitiyLine(
     }
 
     const text = createText()
-    text.innerHTML = "Name"
+    text.innerHTML = entity.id
     text.onclick = () => {
         useStore.getState().select({ results: [{ id: entity.id }] })
     }
