@@ -3,13 +3,24 @@ import { getRawValue, useStore } from "../../state/store.js"
 import { AxisEnabled, TransformControl } from "./transform-control.js"
 import shallow from "zustand/shallow"
 import { ParsedOperation } from "../../../../dist/index.js"
+import { Fragment, useEffect, useState } from "react"
+import { useFrame } from "@react-three/fiber"
+import { getKeyframeIndex } from "../../../../dist/domains/motion/helper.js"
 
 export function PathControl() {
-    const astIds = useStore((state) => state.derivedSelection.astIds)
+    const keyframeIndiciesMap = useStore((state) => state.derivedSelection.keyframeIndiciesMap)
+
     return (
         <>
-            {astIds.map((astId) => (
-                <KeyframeControl astId={astId} key={astId} />
+            {Array.from(keyframeIndiciesMap.keys()).map((resultId) => (
+                <Fragment key={resultId}>
+                    {keyframeIndiciesMap.get(resultId)?.map((_, index) => (
+                        <Fragment key={index}>
+                            <KeyframeControl resultId={resultId} index={index} keyframeOffset={0} />
+                            <KeyframeControl resultId={resultId} index={index} keyframeOffset={1} />
+                        </Fragment>
+                    ))}
+                </Fragment>
             ))}
         </>
     )
@@ -17,8 +28,40 @@ export function PathControl() {
 
 const axis2d: AxisEnabled = [true, false, true]
 
-function KeyframeControl({ astId }: { astId: string }) {
+function computeAstId(resultId: string, index: number, keyframeOffset: number): string | undefined {
+    const state = useStore.getState()
+    const keyframes = state.derivedSelection.keyframeIndiciesMap.get(resultId)?.[index]
+    if (keyframes == null) {
+        return undefined
+    }
+    const keyframeIndex = getKeyframeIndex(keyframes, state.time, 0)
+    if (keyframeIndex == null) {
+        return undefined
+    }
+    const offsettedKeyframeIndex = keyframeIndex + keyframeOffset
+    if (offsettedKeyframeIndex < 0 || offsettedKeyframeIndex >= keyframes.length) {
+        return undefined
+    }
+    return keyframes[offsettedKeyframeIndex].astId
+}
+
+function KeyframeControl({
+    resultId,
+    index,
+    keyframeOffset,
+}: {
+    resultId: string
+    index: number
+    keyframeOffset: number
+}) {
+    const [astId, setAstId] = useState<string | undefined>(() => computeAstId(resultId, index, keyframeOffset))
+
+    useFrame(() => setAstId(computeAstId(resultId, index, keyframeOffset)))
+
     const value = useStore<Vector3Tuple | undefined>(({ descriptions: { transformations } }) => {
+        if (astId == null) {
+            return undefined
+        }
         const transformation = transformations[astId]
         if (transformation == null || transformation.type != "operation" || transformation.identifier != "moveTo") {
             return undefined
@@ -30,7 +73,7 @@ function KeyframeControl({ astId }: { astId: string }) {
         ]
     }, shallow as any)
 
-    if (value == null) {
+    if (value == null || astId == null) {
         return null
     }
 

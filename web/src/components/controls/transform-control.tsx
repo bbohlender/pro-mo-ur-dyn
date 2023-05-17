@@ -58,8 +58,8 @@ export function TransformControl({
         transformControl.addEventListener("mouseUp", mouseUp)
         return () => {
             //useViewerState.getState().setControlling(false)
-            transformControl.removeEventListener("mouseUp", mouseDown)
-            transformControl.removeEventListener("mouseDown", mouseUp)
+            transformControl.removeEventListener("mouseUp", mouseUp)
+            transformControl.removeEventListener("mouseDown", mouseDown)
         }
     }, [set, mode, object])
 

@@ -202,7 +202,6 @@ function updateEntitiyLine(
     const text = createText()
     text.innerHTML = "Name"
     text.onclick = () => {
-        console.log("x")
         useStore.getState().select({ results: [{ id: entity.id }] })
     }
     text.setAttribute("x", rem(xPadding))

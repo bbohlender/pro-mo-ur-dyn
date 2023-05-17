@@ -33,7 +33,7 @@ const translateHelper = new Vector3()
 const scaleHelper = new Vector3()
 const rotationHelper = new Quaternion()
 
-const MaxAgentCount = 100
+const MaxAgentCount = 300
 
 export function AgentsViewer({
     result,
@@ -134,12 +134,13 @@ export function AgentType({
                 translateHelper.y += 0.15
                 helperMatrix.compose(translateHelper, rotationHelper, scaleHelper.setScalar(2.5))
                 ref1.current.setMatrixAt(ref1.current.count, helperMatrix)
-                if (derivedSelection != null) {
-                    ref1.current.setColorAt(
-                        ref1.current.count,
-                        derivedSelection.keyframeIndiciesMap.has(agent.id) ? selectedColor : normalColor
-                    )
-                }
+                ref1.current.setColorAt(
+                    ref1.current.count,
+                    derivedSelection != null && derivedSelection.keyframeIndiciesMap.has(agent.id)
+                        ? selectedColor
+                        : normalColor
+                )
+
                 ref2.current.setMatrixAt(ref1.current.count, helperMatrix)
                 helperMatrix.compose(translateHelper, rotationHelper, scaleHelper.setScalar(agent.radius))
                 //ref3.current.setMatrixAt(ref1.current.count, helperMatrix)
