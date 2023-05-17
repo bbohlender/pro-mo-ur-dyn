@@ -30,7 +30,11 @@ export const entityTypeDefaults = {
         speed: 17,
         radius: 3,
     },
-    //cyclist: {},
+    cyclist: {
+        url: "models/cyclist",
+        radius: 1.5,
+        speed: 4,
+    },
 }
 
 const positionHelper = new Vector3()
@@ -44,6 +48,59 @@ export function distanceTo(dx: number, dy: number, dz: number) {
 }
 
 export const operations: Operations = {
+    follow: {
+        defaultParameters: [],
+        includeThis: true,
+        includeQueue: true,
+        execute: (
+            next: OperationNextCallback,
+            astId: string,
+            entity: MotionEntity,
+            queue: Queue,
+            targetId: string,
+            offsetX = 0,
+            offsetY = 0,
+            offsetZ = 0
+        ) => {
+            //find target
+            const target: MotionEntity | undefined =
+                queue.list.find(({ id, value }) => id === targetId && isMotionEntity(value.raw))?.value?.raw ??
+                queue.results.find(({ id, raw }) => id === targetId && isMotionEntity(raw))?.raw
+
+            if (target == null) {
+                return next(entity, { type: "operation", identifier: "wait", children: [{ type: "raw", value: 1 }] })
+            }
+
+            const lastKeyframe = entity.keyframes[entity.keyframes.length - 1]
+            const currentTime = lastKeyframe.t
+            const speed = lastKeyframe.speed
+
+            if (currentTime === 0) {
+                entity.keyframes.length = 0
+            }
+
+            //add all missing keyframes to this target with a very small delay (+ 0.01) and with the astId
+            for (const keyframe of target.keyframes) {
+                if (keyframe.t < currentTime) {
+                    continue
+                }
+                entity.keyframes.push({
+                    astId,
+                    speed,
+                    t: keyframe.t + 0.01,
+                    x: keyframe.x + offsetX,
+                    y: keyframe.y + offsetY,
+                    z: keyframe.z + offsetZ,
+                })
+            }
+
+            return next(entity, {
+                type: "operation",
+                identifier: "follow",
+                children: [targetId, offsetX, offsetY, offsetZ].map((value) => ({ type: "raw", value })),
+            })
+        },
+    },
     moveTo: {
         defaultParameters: [],
         includeThis: true,
@@ -327,12 +384,6 @@ export function createMotionEntitiy({ type, x, y, z, time }: any, astId: string)
 
 export function getMotionEntityProgress(entity: MotionEntity) {
     return entity.keyframes[entity.keyframes.length - 1].t
-}
-
-export enum MotionEntityType {
-    Car,
-    Pedestrian,
-    Cyclist,
 }
 
 export type MotionEntity = {

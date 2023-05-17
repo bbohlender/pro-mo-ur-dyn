@@ -1,5 +1,4 @@
 import { Canvas } from "@react-three/fiber"
-import { OrbitControls } from "@react-three/drei"
 import { Interface2D } from "./components/interface-2d.js"
 import { useStore } from "./state/store.js"
 import { DragEvent, useEffect, useMemo, useState } from "react"
@@ -152,9 +151,4 @@ function ViewDescriptions({ descriptions }: { descriptions: ParsedDescriptions }
         return null
     }
     return <ResultView result={result} />
-}
-
-export function Orbit() {
-    const controlling = useStore((state) => state.controlling)
-    return <OrbitControls enabled={!controlling} />
 }

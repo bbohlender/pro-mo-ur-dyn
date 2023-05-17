@@ -1,9 +1,10 @@
 import { Suspense } from "react"
 import { AgentsViewer } from "./agents.js"
 import { GeometryResult } from "./geometry-result.js"
-import { Orbit } from "../../app.js"
 import { useStore } from "../../state/store.js"
 import { ContactShadows } from "../contact-shadow.js"
+import { ViewerCamera } from "./camera.js"
+import { ViewControls } from "./view-controls.js"
 
 export function ResultView({ result }: { result: any }) {
     const derivedSelection = useStore((state) => (state.mode === "edit" ? state.derivedSelection : undefined))
@@ -36,7 +37,8 @@ export function ResultView({ result }: { result: any }) {
                 blur={0.5}
                 far={100}
             />
-            <Orbit />
+            <ViewControls />
+            <ViewerCamera />
         </>
     )
 }
