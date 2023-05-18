@@ -1,19 +1,16 @@
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo, useRef } from "react"
+import { useMemo, useRef } from "react"
 import {
-    BoxGeometry,
     BufferGeometry,
     Color,
-    Group,
     InstancedBufferAttribute,
     InstancedMesh,
-    InterpolateDiscrete,
-    LineBasicMaterial,
-    LineSegments,
+    InterpolateLinear,
     Material,
     Matrix4,
     MeshBasicMaterial,
     MeshStandardMaterial,
+    PerspectiveCamera,
     Quaternion,
     QuaternionKeyframeTrack,
     SphereGeometry,
@@ -23,10 +20,10 @@ import { MotionEntity, getEntityPositionAt, getEntityRotationAt, getKeyframeInde
 import { DerivedSelectionState, PrimarySelectionState, updateTime, useStore } from "../../state/store.js"
 import { useModel } from "./use-model.js"
 import { useTexture } from "@react-three/drei"
-import shallowEqual from "zustand/shallow"
 import { KeyframeTrack, Mesh, Object3D, VectorKeyframeTrack } from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { filterNull } from "../../../../dist/util.js"
+import { FOV, rotateY180 } from "./state.js"
 
 const helperMatrix = new Matrix4()
 const translateHelper = new Vector3()
@@ -196,6 +193,12 @@ export async function exportMotion(objects: Array<Object3D>, tracks: Array<Keyfr
     objects.push(
         ...motionEntities
             .map((entity, i) => {
+                const entityName = `motion-entity-${i}`
+                if (entity.type === "camera") {
+                    const camera = new PerspectiveCamera(FOV, 16 / 9)
+                    camera.name = entityName
+                    return camera
+                }
                 if (entity.url == null) {
                     return undefined
                 }
@@ -205,7 +208,7 @@ export async function exportMotion(objects: Array<Object3D>, tracks: Array<Keyfr
                 }
                 const mesh = new Mesh(geometry, new MeshStandardMaterial({ color: "white", toneMapped: false }))
                 mesh.scale.setScalar(2.5)
-                mesh.name = `motion-entity-${i}`
+                mesh.name = entityName
                 return mesh
             })
             .filter(filterNull)
@@ -235,10 +238,13 @@ export async function exportMotion(objects: Array<Object3D>, tracks: Array<Keyfr
                               vectorHelper2.sub(vectorHelper1)
                               vectorHelper2.normalize()
                               quaternionHelper.setFromUnitVectors(ZAXIS, vectorHelper2)
+                              if (entity.type === "camera") {
+                                  quaternionHelper.multiply(rotateY180)
+                              }
                               prev.push(...quaternionHelper.toArray())
                               return prev
                           }, []),
-                          InterpolateDiscrete
+                          InterpolateLinear
                       )
                     : undefined
             )

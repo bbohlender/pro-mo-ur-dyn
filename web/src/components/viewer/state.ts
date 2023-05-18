@@ -41,7 +41,7 @@ const quaternionHelper = new Quaternion()
 
 export const topRotation = new Euler(-Math.PI / 2, 0, 0, "YXZ")
 
-const rotateY180 = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI)
+export const rotateY180 = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI)
 
 const MIN_Y_FLY_CAMERA = 0.1
 const MIN_Y = 1 /*m*/
