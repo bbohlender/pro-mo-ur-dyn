@@ -115,7 +115,6 @@ export function createViewerStateFunctions(set: SetState<ViewerState>, get: GetS
                 }
             }
         },
-        changeView: (state: SateliteViewerState | FlyViewerState) => set(state),
         enterFlyCamera: () => {
             const state = get()
             if (state.viewType === "fly") {
@@ -139,6 +138,13 @@ export function createViewerStateFunctions(set: SetState<ViewerState>, get: GetS
                 viewType: "satelite",
                 position: [x, clip(y, MIN_Y, MAX_Y), z],
             })
+        },
+        toggleView() {
+            if (get().viewType === "fly") {
+                this.backToSateliteView()
+            } else {
+                this.enterFlyCamera()
+            }
         },
     }
 }

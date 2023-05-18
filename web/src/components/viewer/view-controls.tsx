@@ -66,7 +66,7 @@ export function ViewControls() {
     return null
 }
 
-const flySpeed = 0.000001
+const flySpeed = 30
 
 function useMoveFlyCamera() {
     const ref = useRef({

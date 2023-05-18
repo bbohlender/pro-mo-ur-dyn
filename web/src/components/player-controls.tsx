@@ -1,11 +1,13 @@
-import { PauseIcon, PlayIcon } from "@heroicons/react/20/solid"
+import { PauseIcon, PlayIcon, VideoCameraIcon, VideoCameraSlashIcon } from "@heroicons/react/20/solid"
 import { useEffect, useRef, useState } from "react"
 import { useStore } from "../state/store.js"
 import { Panel } from "./panel.js"
+import { useViewerState } from "./viewer/state.js"
 
 export function PlayerControls() {
     const barRef = useRef<HTMLDivElement>(null)
     const playing = useStore((state) => state.playing)
+    const flyCamera = useViewerState((state) => state.viewType === "fly")
     useEffect(() => {
         const interval = setInterval(() => {
             if (barRef.current == null) {
@@ -18,11 +20,14 @@ export function PlayerControls() {
     }, [])
     return (
         <Panel className="flex flex-row items-center gap-5 p-5">
-            <div style={{ minWidth: "3rem", maxWidth: "3rem" }}>
-                <button onClick={useStore.getState().togglePlaying} className="btn btn-primary btn-sm btn-circle">
-                    {playing ? <PauseIcon height={20} /> : <PlayIcon height={20} />}
-                </button>
-            </div>
+            <button
+                onClick={() => useViewerState.getState().toggleView()}
+                className="btn btn-primary btn-sm btn-circle">
+                {flyCamera ? <VideoCameraSlashIcon height={20} /> : <VideoCameraIcon height={20} />}
+            </button>
+            <button onClick={useStore.getState().togglePlaying} className="mr-2 btn btn-primary btn-sm btn-circle">
+                {playing ? <PauseIcon height={20} /> : <PlayIcon height={20} />}
+            </button>
             <div
                 onPointerDown={(e) => {
                     e.currentTarget.setPointerCapture(e.pointerId)
