@@ -132,7 +132,7 @@ export function createViewerStateFunctions(set: SetState<ViewerState>, get: GetS
                 rotation: new Euler().setFromQuaternion(quaternionHelper, "YXZ"),
             })
         },
-        backToSateliteView: () => {
+        enterSateliteView: () => {
             const state = get()
             if (state.viewType === "satelite") {
                 return
@@ -144,13 +144,6 @@ export function createViewerStateFunctions(set: SetState<ViewerState>, get: GetS
                 viewType: "satelite",
                 position,
             })
-        },
-        toggleView() {
-            if (get().viewType === "fly") {
-                this.backToSateliteView()
-            } else {
-                this.enterFlyCamera()
-            }
         },
     }
 }

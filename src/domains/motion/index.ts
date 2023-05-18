@@ -1,6 +1,6 @@
 import { Vector3 } from "three"
 import { OperationNextCallback, Operations } from "../../interpreter/index.js"
-import { getEntityPositionAt, getKeyframeIndex } from "./helper.js"
+import { getEntityPositionAt, getEntityRotationAt, getKeyframeIndex } from "./helper.js"
 import { isPathway, pathwaysToGeometry } from "../pathway/index.js"
 import { Queue } from "../../interpreter/queue.js"
 import { sampleGeometry } from "../sample.js"
@@ -72,16 +72,23 @@ export const operations: Operations = {
                 queue.list.find(({ id, value }) => id === targetId && isMotionEntity(value.raw))?.value?.raw ??
                 queue.results.find(({ id, raw }) => id === targetId && isMotionEntity(raw))?.raw
 
+            const nextFollowTransformation: NestedTransformation = {
+                type: "operation",
+                identifier: "follow",
+                astId,
+                children: [targetId, offsetX, offsetY, offsetZ].map((value) => ({ type: "raw", value })),
+            }
+
             if (target == null) {
                 return next(
                     entity,
-                    { type: "operation", astId, identifier: "wait", children: [{ type: "raw", value: 0.01 }] },
                     {
                         type: "operation",
-                        identifier: "follow",
                         astId,
-                        children: [targetId, offsetX, offsetY, offsetZ].map((value) => ({ type: "raw", value })),
-                    }
+                        identifier: "wait",
+                        children: [{ type: "raw", value: 0.01 }],
+                    },
+                    nextFollowTransformation
                 )
             }
 
@@ -89,9 +96,30 @@ export const operations: Operations = {
             const currentTime = lastKeyframe.t
             const speed = lastKeyframe.speed
 
-            if (currentTime === 0) {
-                entity.keyframes.length = 0
+            const index = getKeyframeIndex(target.keyframes, currentTime, 0)
+
+            if (index == null) {
+                return next(
+                    entity,
+                    {
+                        type: "operation",
+                        astId,
+                        identifier: "wait",
+                        children: [{ type: "raw", value: 0.01 }],
+                    },
+                    nextFollowTransformation
+                )
             }
+
+            getEntityPositionAt(target.keyframes, currentTime, index, positionHelper)
+            entity.keyframes.push({
+                astId,
+                speed,
+                t: currentTime + 0.01,
+                x: positionHelper.x + offsetX,
+                y: positionHelper.y + offsetY,
+                z: positionHelper.z + offsetZ,
+            })
 
             //add all missing keyframes to this target with a very small delay (+ 0.01) and with the astId
             for (const keyframe of target.keyframes) {
@@ -108,12 +136,7 @@ export const operations: Operations = {
                 })
             }
 
-            return next(entity, {
-                type: "operation",
-                identifier: "follow",
-                astId,
-                children: [targetId, offsetX, offsetY, offsetZ].map((value) => ({ type: "raw", value })),
-            })
+            return next(entity, nextFollowTransformation)
         },
     },
     moveTo: {

@@ -20,7 +20,7 @@ export function CameraList() {
                     <Panel
                         onClick={() => useViewerState.getState().enterResultCamera(cameraId)}
                         key={cameraId}
-                        color={selected ? "rgba(50, 50, 255, 0.8)" : undefined}
+                        color={selected ? "rgba(30, 30, 220, 0.7)" : undefined}
                         className={`${selected ? "text-white" : ""} p-3 flex justify-between cursor-pointer`}>
                         <span>Camera</span>
                         <span className="font-bold">#{cameraId}</span>

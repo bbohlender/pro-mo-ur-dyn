@@ -1,4 +1,4 @@
-import { PauseIcon, PlayIcon, VideoCameraIcon, VideoCameraSlashIcon } from "@heroicons/react/20/solid"
+import { PauseIcon, PlayIcon, VideoCameraIcon, MapIcon } from "@heroicons/react/20/solid"
 import { useEffect, useRef, useState } from "react"
 import { useStore } from "../state/store.js"
 import { Panel } from "./panel.js"
@@ -7,7 +7,7 @@ import { useViewerState } from "./viewer/state.js"
 export function PlayerControls() {
     const barRef = useRef<HTMLDivElement>(null)
     const playing = useStore((state) => state.playing)
-    const flyCamera = useViewerState((state) => state.viewType === "fly")
+    const viewType = useViewerState((state) => state.viewType)
     useEffect(() => {
         const interval = setInterval(() => {
             if (barRef.current == null) {
@@ -21,9 +21,14 @@ export function PlayerControls() {
     return (
         <Panel className="flex flex-row items-center gap-5 p-5">
             <button
-                onClick={() => useViewerState.getState().toggleView()}
-                className="btn btn-primary btn-sm btn-circle">
-                {flyCamera ? <VideoCameraSlashIcon height={20} /> : <VideoCameraIcon height={20} />}
+                onClick={() => useViewerState.getState().enterSateliteView()}
+                className={`${viewType === "satelite" ? "btn-primary" : "btn-ghost opacity-50"} btn btn-sm btn-circle`}>
+                <MapIcon height={20} />
+            </button>
+            <button
+                onClick={() => useViewerState.getState().enterFlyCamera()}
+                className={`${viewType === "fly" ? "btn-primary" : "btn-ghost opacity-50"} btn btn-sm btn-circle`}>
+                <VideoCameraIcon height={20} />
             </button>
             <button onClick={useStore.getState().togglePlaying} className="mr-2 btn btn-primary btn-sm btn-circle">
                 {playing ? <PauseIcon height={20} /> : <PlayIcon height={20} />}
