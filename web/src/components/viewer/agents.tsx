@@ -48,7 +48,9 @@ export function AgentsViewer({
         () =>
             Array.from(
                 (result.agents as Array<MotionEntity> | undefined)?.reduce((prev, entity) => {
-                    prev.add(entity.url)
+                    if (entity.url != null) {
+                        prev.add(entity.url)
+                    }
                     return prev
                 }, new Set<string>()) ?? []
             ),
@@ -184,7 +186,7 @@ export async function exportMotion(objects: Array<Object3D>, tracks: Array<Keyfr
     }
     const geometryMap = new Map<string, BufferGeometry>()
     for (const entity of motionEntities) {
-        if (geometryMap.has(entity.url)) {
+        if (entity.url == null || geometryMap.has(entity.url)) {
             continue
         }
         const gltf = await gltfLoader.loadAsync(`${entity.url}.glb`)
@@ -192,16 +194,21 @@ export async function exportMotion(objects: Array<Object3D>, tracks: Array<Keyfr
         geometryMap.set(entity.url, mesh.geometry)
     }
     objects.push(
-        ...motionEntities.map((entity, i) => {
-            const geometry = geometryMap.get(entity.url)
-            if (geometry == null) {
-                throw new Error(`missing geometry for url "${entity.url}"`)
-            }
-            const mesh = new Mesh(geometry, new MeshStandardMaterial({ color: "white", toneMapped: false }))
-            mesh.scale.setScalar(2.5)
-            mesh.name = `motion-entity-${i}`
-            return mesh
-        })
+        ...motionEntities
+            .map((entity, i) => {
+                if (entity.url == null) {
+                    return undefined
+                }
+                const geometry = geometryMap.get(entity.url)
+                if (geometry == null) {
+                    throw new Error(`missing geometry for url "${entity.url}"`)
+                }
+                const mesh = new Mesh(geometry, new MeshStandardMaterial({ color: "white", toneMapped: false }))
+                mesh.scale.setScalar(2.5)
+                mesh.name = `motion-entity-${i}`
+                return mesh
+            })
+            .filter(filterNull)
     )
     tracks.push(
         ...motionEntities.map(

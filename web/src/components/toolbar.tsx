@@ -33,7 +33,7 @@ export function Toolbar() {
                 Delete Pathways
             </div>
             <div
-                onClick={() => useStore.getState().deleteType(undefined, "agent")}
+                onClick={() => useStore.getState().deleteType(undefined, "pedestrian", "cyclist", "bus", "car")}
                 className="btn btn-outline border-slate-300 btn-sm">
                 Delete Agents
             </div>
@@ -131,6 +131,21 @@ async function importAgents(spaceScale: number, timeScale: number) {
     const descriptions: NestedDescriptions = {}
 
     for (const [name, keyframes] of map.entries()) {
+        const regex = /\"/g
+        const typeName: string | undefined = keyframes[0].type?.replace(regex, "")
+        let type: string
+        switch (typeName) {
+            case "Bus":
+            case "Car":
+            case "Pedestrian":
+                type = typeName.toLocaleLowerCase()
+                break
+            case "Biker":
+                type = "cyclist"
+                break
+            default:
+                continue
+        }
         const simplifiedKeyframes = simplify(
             keyframes.map((data) => ({ ...getCenter(data), t: data.t })),
             0.2
@@ -142,7 +157,7 @@ async function importAgents(spaceScale: number, timeScale: number) {
         let lastTime = simplifiedKeyframes[0].t
         const startCenter = simplifiedKeyframes[0]
         descriptions[name] = {
-            initialVariables: { x: startCenter.x, y: 0, z: startCenter.y, t: lastTime },
+            initialVariables: { x: startCenter.x, y: 0, z: startCenter.y, t: lastTime, type },
             nouns: {
                 Start: {
                     transformation: {

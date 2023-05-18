@@ -1,5 +1,5 @@
 import { Vector3 } from "three"
-import { InterpreterOptions, OperationNextCallback, Operations } from "../../interpreter/index.js"
+import { OperationNextCallback, Operations } from "../../interpreter/index.js"
 import { getEntityPositionAt, getKeyframeIndex } from "./helper.js"
 import { isPathway, pathwaysToGeometry } from "../pathway/index.js"
 import { Queue } from "../../interpreter/queue.js"
@@ -35,6 +35,11 @@ export const entityTypeDefaults = {
         radius: 1.5,
         speed: 4,
     },
+    camera: {
+        url: undefined,
+        radius: 0,
+        speed: 5,
+    },
 }
 
 const positionHelper = new Vector3()
@@ -68,7 +73,16 @@ export const operations: Operations = {
                 queue.results.find(({ id, raw }) => id === targetId && isMotionEntity(raw))?.raw
 
             if (target == null) {
-                return next(entity, { type: "operation", identifier: "wait", children: [{ type: "raw", value: 1 }] })
+                return next(
+                    entity,
+                    { type: "operation", astId, identifier: "wait", children: [{ type: "raw", value: 0.01 }] },
+                    {
+                        type: "operation",
+                        identifier: "follow",
+                        astId,
+                        children: [targetId, offsetX, offsetY, offsetZ].map((value) => ({ type: "raw", value })),
+                    }
+                )
             }
 
             const lastKeyframe = entity.keyframes[entity.keyframes.length - 1]
@@ -97,6 +111,7 @@ export const operations: Operations = {
             return next(entity, {
                 type: "operation",
                 identifier: "follow",
+                astId,
                 children: [targetId, offsetX, offsetY, offsetZ].map((value) => ({ type: "raw", value })),
             })
         },
@@ -111,10 +126,11 @@ export const operations: Operations = {
             entity: MotionEntity,
             x: number,
             y: number,
-            z: number
+            z: number,
+            deltaT?: number
         ) => {
             const { x: currentX, y: currentY, z: currentZ, t, speed } = entity.keyframes[entity.keyframes.length - 1]
-            const dt = distanceTo(currentX - x, currentY - y, currentZ - z) / speed
+            const dt = deltaT ?? distanceTo(currentX - x, currentY - y, currentZ - z) / speed
             entity.keyframes.push({ x, y, z, t: t + dt, astId, speed })
             return next(entity)
         },
@@ -238,6 +254,7 @@ export const operations: Operations = {
                             speed: keyframe.speed,
                         },
                     ],
+                    type: entity.type,
                     radius: entity.radius,
                     url: entity.url,
                     id: "",
@@ -378,6 +395,7 @@ export function createMotionEntitiy({ type, x, y, z, time }: any, astId: string)
         keyframes: [{ x: x ?? 0, y: y ?? 0, z: z ?? 0, t: time ?? 0, astId, speed: defaults.speed }],
         radius: defaults.radius,
         url: defaults.url,
+        type,
         id: "",
     }
 }
@@ -388,9 +406,10 @@ export function getMotionEntityProgress(entity: MotionEntity) {
 
 export type MotionEntity = {
     keyframes: Array<Keyframe>
-    url: string
+    url?: string
     radius: number
     id: string
+    type: string
 }
 
 export type Keyframe = {

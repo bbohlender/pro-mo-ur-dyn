@@ -10,13 +10,19 @@ import { MultiHeader } from "./multi-header.js"
 import { Panel } from "./panel.js"
 import { ArrowDownIcon, PlusIcon } from "@heroicons/react/20/solid"
 import { serializeString } from "pro-3d-video"
+import { CameraList } from "./camera-list.js"
 
 export function Interface2D() {
     const mode = useStore((state) => state.mode)
     return (
         <div className="pointer-events-none z-20 gap-5 m-5 flex flex-col absolute inset-0">
             <div className="flex-1 min-h-0 gap-5 flex flex-row items-start justify-center">
-                {mode === "view" && <Toolbar />}
+                {mode === "view" && (
+                    <div className="flex flex-col gap-3">
+                        <Toolbar />
+                        <CameraList />
+                    </div>
+                )}
                 {mode === "edit" && <EditHeader />}
                 {mode === "derive" && <DeriveHeader />}
                 {mode === "multi" && <MultiHeader />}
