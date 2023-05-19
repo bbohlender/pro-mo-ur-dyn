@@ -26,7 +26,6 @@ export function findPathTo(
 }
 
 export function randomPointOn(queue: Queue, type: string, radius: number, seed: string): Vector3 {
-    console.log(seed)
     const pathfinding = getPathfinding(queue, type, radius)
     const groups: Array<Array<{ centroid: Vector3 }>> = pathfinding.zones[ZONE].groups
     const allLength = groups.reduce((prev, g) => prev + g.length, 0)

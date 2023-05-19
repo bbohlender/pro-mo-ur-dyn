@@ -16,7 +16,7 @@ import { exportMotion } from "./viewer/agents.js"
 export function Toolbar() {
     return (
         <Panel className="rounded gap-3 p-3 flex flex-col">
-            <div onClick={() => importAgents(0.1, 0.01)} className="btn btn-outline border-slate-300 btn-sm">
+            <div onClick={() => importAgents(0.2, 0.1)} className="btn btn-outline border-slate-300 btn-sm">
                 Import Agents
             </div>
             <div onClick={importBuildingsPathways} className="btn btn-outline border-slate-300 btn-sm">
@@ -148,7 +148,7 @@ async function importAgents(spaceScale: number, timeScale: number) {
         }
         const simplifiedKeyframes = simplify(
             keyframes.map((data) => ({ ...getCenter(data), t: data.t })),
-            0.2
+            2
         ) as Array<{
             x: number
             y: number
