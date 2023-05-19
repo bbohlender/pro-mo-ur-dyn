@@ -26,7 +26,7 @@ import {
 } from "three"
 import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { makeScaleMatrix, computeDirectionMatrix, makeRotationMatrix, makeTranslationMatrix } from "./math.js"
-import { sampleGeometry, distributeOverSizes } from "../sample.js"
+//import { sampleGeometry, distributeOverSizes } from "../sample.js"
 import { filterNull } from "../../util.js"
 
 const helperMatrix = new Matrix4()
@@ -90,7 +90,7 @@ export abstract class Primitive {
 
     abstract getSize(dimension: number): number
     abstract extrude(by: number): Primitive
-    abstract samplePoints(amount: number): Array<Primitive>
+    //abstract samplePoints(amount: number): Array<Primitive>
     abstract components(type: "points" | "lines" | "faces"): Array<Primitive>
     abstract clone(): Primitive
     protected abstract computeObject3D(): Object3D
@@ -303,7 +303,7 @@ export class FacePrimitive extends Primitive {
         return 0
     }
 
-    samplePoints(amount: number): Primitive[] {
+    /*samplePoints(amount: number): Primitive[] {
         const geometry = this.getGeometry()
         if (geometry == null) {
             return []
@@ -314,7 +314,7 @@ export class FacePrimitive extends Primitive {
                     this.matrix.clone().multiply(makeTranslationMatrix(position.x, position.y, position.z))
                 )
         )
-    }
+    }*/
 }
 
 export function swapYZ(geometry: BufferGeometry): void {
@@ -326,7 +326,6 @@ export function swapYZ(geometry: BufferGeometry): void {
         temp = positionAttribute.getY(i)
         positionAttribute.setY(i, positionAttribute.getZ(i))
         positionAttribute.setZ(i, temp)
-
 
         temp = normalAttribute.getY(i)
         normalAttribute.setY(i, normalAttribute.getZ(i))
@@ -477,7 +476,7 @@ export class GeometryPrimitive extends Primitive {
     getSize(dimension: number): number {
         throw new Error("Method not implemented.")
     }
-    samplePoints(amount: number): Primitive[] {
+    /*samplePoints(amount: number): Primitive[] {
         const geometry = this.getGeometry()
         if (geometry == null) {
             return []
@@ -488,7 +487,7 @@ export class GeometryPrimitive extends Primitive {
                     this.matrix.clone().multiply(makeTranslationMatrix(position.x, position.y, position.z))
                 )
         )
-    }
+    }*/
 }
 
 export class CombinedPrimitive extends Primitive {
@@ -560,7 +559,7 @@ export class CombinedPrimitive extends Primitive {
         return this.primitives.reduce((prev, primitive) => primitive.getSize(dimension) + prev, 0)
     }
 
-    samplePoints(amount: number): Primitive[] {
+    /*samplePoints(amount: number): Primitive[] {
         const sizes = this.primitives.map((primitive) => primitive.getSize(2))
         const amounts = distributeOverSizes(sizes, amount)
         const result: Array<Primitive> = []
@@ -572,7 +571,7 @@ export class CombinedPrimitive extends Primitive {
             result.push(...this.primitives[index].samplePoints(amountAtIndex))
         }
         return result
-    }
+    }*/
 }
 
 /*export class EmptyPrimitive extends Primitive {

@@ -1,4 +1,4 @@
-import { PauseIcon, PlayIcon, VideoCameraIcon, MapIcon } from "@heroicons/react/20/solid"
+import { PauseIcon, PlayIcon, VideoCameraIcon, MapIcon, PlusIcon, MinusIcon } from "@heroicons/react/20/solid"
 import { useEffect, useRef, useState } from "react"
 import { useStore } from "../state/store.js"
 import { Panel } from "./panel.js"
@@ -7,6 +7,9 @@ import { useViewerState } from "./viewer/state.js"
 export function PlayerControls() {
     const barRef = useRef<HTMLDivElement>(null)
     const playing = useStore((state) => state.playing)
+    const seed = useStore((state) =>
+        parseInt(Object.values(state.descriptions.descriptions)[0]?.initialVariables?.seed ?? "0")
+    )
     const viewType = useViewerState((state) => state.viewType)
     useEffect(() => {
         const interval = setInterval(() => {
@@ -54,6 +57,15 @@ export function PlayerControls() {
                 </div>
             </div>
             <Duration />
+            <div className="btn-group text-white">
+                <button onClick={() => useStore.getState().setSeed(seed - 1)} className="btn btn-sm">
+                    <MinusIcon height={20} />
+                </button>
+                <p className="text-lg px-2 flex items-center bg-gray-700">{seed}</p>
+                <button onClick={() => useStore.getState().setSeed(seed + 1)} className="btn btn-sm">
+                    <PlusIcon height={20} />
+                </button>
+            </div>
         </Panel>
     )
 }

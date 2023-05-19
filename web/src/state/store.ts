@@ -68,6 +68,19 @@ const loader = new BufferGeometryLoader()
 
 export const useStore = createZustand(
     combine(createInitialState(), (set, get) => ({
+        setSeed(seed: number) {
+            const { descriptions, nouns, transformations } = get().descriptions
+            const newDescriptions: ParsedDescriptions = {
+                descriptions: structuredClone(descriptions),
+                nouns,
+                transformations,
+            }
+            for (const newDescription of Object.values(newDescriptions.descriptions)) {
+                newDescription.initialVariables.seed = seed.toString()
+            }
+            this.updateDescriptions(newDescriptions)
+        },
+
         setControlling(controlling: boolean) {
             set({ controlling })
         },
@@ -205,9 +218,9 @@ export const useStore = createZustand(
                     for (const astId of astIds) {
                         const agent = agents[i]
                         if (agent.keyframes[0].astId === astId) {
-                            newDescription.initialVariables.x = agent.keyframes[0].x
-                            newDescription.initialVariables.y = agent.keyframes[0].y
-                            newDescription.initialVariables.z = agent.keyframes[0].z
+                            newDescription.initialVariables.x = agent.keyframes[0].position[0]
+                            newDescription.initialVariables.y = agent.keyframes[0].position[1]
+                            newDescription.initialVariables.z = agent.keyframes[0].position[2]
                             if (agent.keyframes[0].t != 0) {
                                 newDescription.initialVariables.time = agent.keyframes[0].t
                             }
@@ -231,9 +244,9 @@ export const useStore = createZustand(
                             const keyframe = agent.keyframes[keyframeIndex]
                             const prevKeyframe = agent.keyframes[keyframeIndex - 1]
                             const distanceToPrev = distanceTo(
-                                prevKeyframe.x - keyframe.x,
-                                prevKeyframe.y - keyframe.y,
-                                prevKeyframe.z - keyframe.z
+                                prevKeyframe.position[0] - keyframe.position[0],
+                                prevKeyframe.position[1] - keyframe.position[1],
+                                prevKeyframe.position[2] - keyframe.position[2]
                             )
                             if (distanceToPrev < 0.01) {
                                 replacement.children.push({
@@ -250,7 +263,7 @@ export const useStore = createZustand(
                                 replacement.children.push({
                                     type: "operation",
                                     identifier: "moveTo",
-                                    children: [keyframe.x, keyframe.y, keyframe.z].map((value) => ({
+                                    children: keyframe.position.map((value) => ({
                                         type: "raw",
                                         value,
                                     })),
@@ -290,10 +303,10 @@ export const useStore = createZustand(
                     )
                     newDescriptions[nameFunction(descriptionIdentifier)!] = newDescription
                 }
-            }
 
-            for (const descriptionIdentifier of descriptionIdentifierToAstIdMap.keys()) {
-                delete newDescriptions[descriptionIdentifier]
+                if (agents.length > 1) {
+                    delete newDescriptions[descriptionIdentifier]
+                }
             }
 
             this.updateDescriptions(flattenAST(newDescriptions))

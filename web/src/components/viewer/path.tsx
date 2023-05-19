@@ -43,9 +43,10 @@ export function addLines(group: Group, keyframes: Array<Keyframe>) {
     const points: Array<Vector3> = []
 
     for (let i = 1; i < keyframes.length; i++) {
-        const p1 = keyframes[i - 1]
-        const p2 = keyframes[i]
-        points.push(new Vector3(p1.x, p1.y + 0.1, p1.z), new Vector3(p2.x, p2.y + 0.05, p2.z))
+        const p1 = new Vector3(...keyframes[i - 1].position)
+        const p2 = new Vector3(...keyframes[i].position)
+        p1.y += 0.05
+        points.push(p1, p2)
     }
 
     group.add(new LineSegments(new BufferGeometry().setFromPoints(points), lineMaterial))

@@ -1,10 +1,8 @@
-import { Vector3 } from "three"
+import { Quaternion, Vector3, Vector3Tuple, Vector4Tuple } from "three"
 import { OperationNextCallback, Operations } from "../../interpreter/index.js"
 import { getEntityPositionAt, getEntityRotationAt, getKeyframeIndex } from "./helper.js"
-import { isPathway, pathwaysToGeometry } from "../pathway/index.js"
 import { Queue } from "../../interpreter/queue.js"
-import { sampleGeometry } from "../sample.js"
-import { findPathTo } from "./pathfinding.js"
+import { findPathTo, randomPointOn } from "./pathfinding.js"
 import { NestedTransformation } from "../../index.js"
 
 const TIME_STEP = 0.1 //ms
@@ -60,6 +58,7 @@ export const operations: Operations = {
         execute: (
             next: OperationNextCallback,
             astId: string,
+            seed: string,
             entity: MotionEntity,
             queue: Queue,
             targetId: string,
@@ -112,13 +111,13 @@ export const operations: Operations = {
             }
 
             getEntityPositionAt(target.keyframes, currentTime, index, positionHelper)
+            getEntityRotationAt(target.keyframes, currentTime, index, quaternionHelper)
             entity.keyframes.push({
                 astId,
                 speed,
                 t: currentTime + 0.01,
-                x: positionHelper.x + offsetX,
-                y: positionHelper.y + offsetY,
-                z: positionHelper.z + offsetZ,
+                position: [positionHelper.x + offsetX, positionHelper.y + offsetY, positionHelper.z + offsetZ],
+                rotation: quaternionHelper.toArray() as Vector4Tuple,
             })
 
             //add all missing keyframes to this target with a very small delay (+ 0.01) and with the astId
@@ -130,9 +129,12 @@ export const operations: Operations = {
                     astId,
                     speed,
                     t: keyframe.t + 0.01,
-                    x: keyframe.x + offsetX,
-                    y: keyframe.y + offsetY,
-                    z: keyframe.z + offsetZ,
+                    position: [
+                        keyframe.position[0] + offsetX,
+                        keyframe.position[1] + offsetY,
+                        keyframe.position[2] + offsetZ,
+                    ],
+                    rotation: keyframe.rotation,
                 })
             }
 
@@ -146,15 +148,24 @@ export const operations: Operations = {
         execute: (
             next: OperationNextCallback,
             astId: string,
+            seed: string,
             entity: MotionEntity,
             x: number,
             y: number,
             z: number,
             deltaT?: number
         ) => {
-            const { x: currentX, y: currentY, z: currentZ, t, speed } = entity.keyframes[entity.keyframes.length - 1]
+            const { position, t, speed } = entity.keyframes[entity.keyframes.length - 1]
+            const [currentX, currentY, currentZ] = position
             const dt = deltaT ?? distanceTo(currentX - x, currentY - y, currentZ - z) / speed
-            entity.keyframes.push({ x, y, z, t: t + dt, astId, speed })
+            const nextPosition: Vector3Tuple = [x, y, z]
+            entity.keyframes.push({
+                position: nextPosition,
+                rotation: computeRotationFromKeyframes(position, nextPosition),
+                t: t + Math.max(0.01, dt),
+                astId,
+                speed,
+            })
             return next(entity)
         },
     },
@@ -162,7 +173,7 @@ export const operations: Operations = {
         defaultParameters: [],
         includeThis: true,
         includeQueue: false,
-        execute: (next, astId, entity: MotionEntity, speed: number) => {
+        execute: (next, astId, seed, entity: MotionEntity, speed: number) => {
             entity.keyframes[entity.keyframes.length - 1].speed = speed
             return next(entity)
         },
@@ -170,7 +181,7 @@ export const operations: Operations = {
     later: {
         defaultParameters: [],
         includeQueue: false,
-        execute: (next, astId, entity: MotionEntity, t: number) => {
+        execute: (next, astId, seed, entity: MotionEntity, t: number) => {
             entity.keyframes[entity.keyframes.length - 1].t += t
             return next(entity)
         },
@@ -179,31 +190,31 @@ export const operations: Operations = {
     clone: {
         defaultParameters: [],
         includeQueue: false,
-        execute: (next, astId, entity: MotionEntity, amount: number) => {
+        execute: (next, astId, seed, entity: MotionEntity, amount: number) => {
             return next(new Array(amount).fill(null).map(() => structuredClone(entity)))
         },
         includeThis: true,
     },
     randomPointOn: {
         defaultParameters: [],
-        execute: (next, astId, queue: Queue, type: string) => {
-            const geometry = queue.getCached(type, (results) =>
-                pathwaysToGeometry(results.map(({ raw }) => raw).filter(isPathway), type)
+        execute: (next, astId, seed: string, entity: MotionEntity, queue: Queue, type: string) => {
+            const { x, y, z } = randomPointOn(
+                queue,
+                type,
+                entity.radius,
+                seed + entity.keyframes[entity.keyframes.length - 1].t
             )
-            if (geometry == null) {
-                return next(null)
-            }
-            const [{ x, y, z }] = sampleGeometry(geometry, 1)
             return next({ x, y, z })
         },
         includeQueue: true,
-        includeThis: false,
+        includeThis: true,
     },
     pathOnToAndDodge: {
         defaultParameters: [],
         execute: (
             next,
             astId,
+            seed,
             entity: MotionEntity,
             queue: Queue,
             type: string,
@@ -232,14 +243,17 @@ export const operations: Operations = {
         execute: (
             next,
             astId,
+            seed,
             entity: MotionEntity,
             queue: Queue,
             type: string,
             { x, y, z }: { x: number; y: number; z: number }
         ) => {
             const keyframe = entity.keyframes[entity.keyframes.length - 1]
-            const path = findPathTo(queue, type, entity.radius, keyframe, x, y, z)
-            if (path != null) {
+            vectorHelper1.set(...keyframe.position)
+            let path = findPathTo(queue, type, entity.radius, keyframe, x, y, z)
+            path = path?.filter((position, i) => position.distanceTo(i === 0 ? vectorHelper1 : path![i - 1]) > 0.01)
+            if (path != null && path.length > 0) {
                 return next(
                     entity,
                     ...path.map<NestedTransformation>(({ x, y, z }) => ({
@@ -257,21 +271,14 @@ export const operations: Operations = {
     },
     spawnOn: {
         defaultParameters: [],
-        execute: (next, astId, entity: MotionEntity, queue: Queue, type = "street", amount = 1) => {
-            const pathwayGeometry = queue.getCached(type, (results) =>
-                pathwaysToGeometry(results.map(({ raw }) => raw).filter(isPathway), type)
-            )
-            if (pathwayGeometry == null) {
-                return next([])
-            }
+        execute: (next, astId, seed, entity: MotionEntity, queue: Queue, type = "street", amount = 1) => {
             const keyframe = entity.keyframes[entity.keyframes.length - 1]
             return next(
-                sampleGeometry(pathwayGeometry, amount).map<MotionEntity>(({ x, y, z }) => ({
+                new Array(amount).fill(null).map<MotionEntity>((_, i) => ({
                     keyframes: [
                         {
-                            x,
-                            y,
-                            z,
+                            position: randomPointOn(queue, type, entity.radius, seed + i + keyframe.t).toArray(),
+                            rotation: defaultRotation,
                             astId,
                             t: keyframe.t,
                             speed: keyframe.speed,
@@ -290,13 +297,12 @@ export const operations: Operations = {
     wait: {
         defaultParameters: [],
         includeQueue: false,
-        execute: (next, astId, entity: MotionEntity, t: number) => {
-            const { x, y, z, t: oldT, speed } = entity.keyframes[entity.keyframes.length - 1]
+        execute: (next, astId, seed, entity: MotionEntity, t: number) => {
+            const { position, rotation, t: oldT, speed } = entity.keyframes[entity.keyframes.length - 1]
             entity.keyframes.push({
                 astId,
-                x,
-                y,
-                z,
+                position,
+                rotation,
                 t: oldT + t,
                 speed,
             })
@@ -311,14 +317,22 @@ export const operations: Operations = {
         execute: (
             next: OperationNextCallback,
             astId: string,
+            seed: string,
             entity: MotionEntity,
             dx: number,
             dy: number,
             dz: number
         ) => {
-            const { x, y, z, t, speed } = entity.keyframes[entity.keyframes.length - 1]
+            const { position, t, speed } = entity.keyframes[entity.keyframes.length - 1]
             const dt = distanceTo(dx, dy, dz) / speed
-            entity.keyframes.push({ x: x + dx, y: y + dy, z: z + dz, t: t + dt, astId, speed })
+            const nextPosition: Vector3Tuple = [position[0] + dx, position[1] + dy, position[2] + dz]
+            entity.keyframes.push({
+                position: nextPosition,
+                rotation: computeRotationFromKeyframes(position, nextPosition),
+                t: t + dt,
+                astId,
+                speed,
+            })
             return next(entity)
         },
     },
@@ -329,19 +343,19 @@ export const operations: Operations = {
         execute: (
             next: OperationNextCallback,
             astId: string,
+            seed: string,
             entity: MotionEntity,
             queue: Queue,
             targetX: number,
             targetY: number,
             targetZ: number
         ) => {
-            const { x, y, z, t, speed } = entity.keyframes[entity.keyframes.length - 1]
-            let dx = targetX - x
-            let dy = targetY - y
-            let dz = targetZ - z
+            const { position, t, speed } = entity.keyframes[entity.keyframes.length - 1]
+            let dx = targetX - position[0]
+            let dy = targetY - position[1]
+            let dz = targetZ - position[2]
             const fullDistanceLength = distanceTo(dx, dy, dz)
             const stepDistance = Math.min(TIME_STEP * speed, fullDistanceLength)
-            const stepDuration = stepDistance / speed
             //normalise and apply the step size
             if (fullDistanceLength === 0) {
                 dx = 0
@@ -353,14 +367,14 @@ export const operations: Operations = {
                 dz = (dz / fullDistanceLength) * stepDistance
             }
 
-            const newX = x + dx
-            const newY = y + dy
-            const newZ = z + dz
+            const newX = position[0] + dx
+            const newY = position[1] + dy
+            const newZ = position[2] + dz
 
-            let nextX = x,
-                nextY = y,
-                nextZ = z
-            const nextT = t + stepDuration
+            let nextX = position[0],
+                nextY = position[1],
+                nextZ = position[2]
+            const nextT = t + Math.max(0.01, stepDistance / speed)
             if (
                 !isColliding(
                     entity,
@@ -375,7 +389,15 @@ export const operations: Operations = {
                 nextZ = newZ
             }
 
-            entity.keyframes.push({ x: nextX, y: nextY, z: nextZ, t: nextT, astId, speed })
+            const nextPosition: Vector3Tuple = [nextX, nextY, nextZ]
+
+            entity.keyframes.push({
+                position: nextPosition,
+                rotation: computeRotationFromKeyframes(position, nextPosition),
+                t: nextT,
+                astId,
+                speed,
+            })
 
             if (fullDistanceLength <= stepDistance) {
                 return next(entity) //done
@@ -409,13 +431,38 @@ function isColliding(entity: MotionEntity, environment: Array<any>, position: Ve
     return false
 }
 
+const defaultRotation: Vector4Tuple = [1, 0, 0, 0]
+
+const vectorHelper1 = new Vector3()
+const vectorHelper2 = new Vector3()
+const quaternionHelper = new Quaternion()
+
+const ZAXIS = new Vector3(0, 0, 1)
+
+function computeRotationFromKeyframes(p1: Vector3Tuple, p2: Vector3Tuple) {
+    vectorHelper1.set(...p1)
+    vectorHelper2.set(...p2)
+    vectorHelper2.sub(vectorHelper1)
+    vectorHelper2.normalize()
+    quaternionHelper.setFromUnitVectors(ZAXIS, vectorHelper2)
+    return quaternionHelper.toArray() as Vector4Tuple
+}
+
 export function createMotionEntitiy({ type, x, y, z, time }: any, astId: string): MotionEntity {
     const defaults = entityTypeDefaults[(type ?? "pedestrian") as keyof typeof entityTypeDefaults]
     if (defaults == null) {
         throw new Error(`unknown type "${type}"`)
     }
     return {
-        keyframes: [{ x: x ?? 0, y: y ?? 0, z: z ?? 0, t: time ?? 0, astId, speed: defaults.speed }],
+        keyframes: [
+            {
+                position: [x ?? 0, y ?? 0, z ?? 0],
+                t: time ?? 0,
+                rotation: defaultRotation,
+                astId,
+                speed: defaults.speed,
+            },
+        ],
         radius: defaults.radius,
         url: defaults.url,
         type,
@@ -436,10 +483,9 @@ export type MotionEntity = {
 }
 
 export type Keyframe = {
-    x: number
-    y: number
-    z: number
     t: number
+    position: Vector3Tuple
+    rotation: Vector4Tuple
     astId: string
     speed: number
 }

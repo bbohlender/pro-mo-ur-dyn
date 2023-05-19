@@ -18,7 +18,7 @@ export const operations: Operations = {
         defaultParameters: [],
         includeThis: true,
         includeQueue: false,
-        execute: (next, astId, pathway: Pathway, x: number, y: number, size: number) => {
+        execute: (next, astId, seed, pathway: Pathway, x: number, y: number, size: number) => {
             return next({
                 points: [{ x, y, size, astId }],
                 type: pathway.type,
@@ -29,7 +29,7 @@ export const operations: Operations = {
         defaultParameters: [],
         includeThis: true,
         includeQueue: false,
-        execute: (next, astId, value: Pathway, x: number, y: number, size: number) => {
+        execute: (next, astId, seed, value: Pathway, x: number, y: number, size: number) => {
             value.points.push({ x, y, size, astId })
             return next(value)
         },

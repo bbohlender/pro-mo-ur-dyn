@@ -18,6 +18,7 @@ const vectorHelper = new Vector3()
 export function computeGableRoof(
     next: OperationNextCallback,
     astId: string,
+    seed: string,
     instance: Primitive,
     rotation?: number,
     width?: number,

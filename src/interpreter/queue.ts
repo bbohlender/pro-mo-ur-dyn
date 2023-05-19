@@ -7,6 +7,7 @@ export type QueueEntry = {
      * list of transformation that still needs to be executed, next transformation that should be executed is at stack[0]
      */
     stack: Array<NestedTransformation>
+    seed: string
     id: string
 }
 

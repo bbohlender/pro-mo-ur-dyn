@@ -14,12 +14,12 @@ import {
     NestedUnaryOperator,
     ParsedRaw,
     NestedPrecomputedOperation,
+    cyrb53Random,
 } from "../index.js"
 import { Queue, QueueEntry } from "./queue.js"
-import murmurhash from "murmurhash"
 
 export type Operation = {
-    execute: (next: OperationNextCallback, astId: string, ...parameters: ReadonlyArray<any>) => any
+    execute: (next: OperationNextCallback, astId: string, seed: string, ...parameters: ReadonlyArray<any>) => any
     includeThis: boolean
     includeQueue: boolean
     defaultParameters: Array<() => NestedTransformation>
@@ -47,7 +47,6 @@ export type InterpreterReferences = {
 }
 
 export type InterpreterOptions = Readonly<{
-    seed?: number
     listeners?: {
         onStochasticSwitch?: (step: NestedStochasticSwitch, value: Value, childStepIndex: number) => void
         onBeforeTransformation?: (step: NestedTransformation, value: Value) => void
@@ -85,6 +84,7 @@ export function interprete(
                 raw: options.createValue(initialVariables, noun.astId!),
                 variables: { ...initialVariables, index: 0 },
             },
+            seed: initialVariables.seed ?? "0",
             id: i.toString(),
             stack: [noun.transformation],
         })
@@ -118,6 +118,7 @@ function nextQueued(
                         index,
                     },
                 },
+                seed: currentEntry.seed,
                 id: `${currentEntry.id}${index}`,
                 stack: [...newTransformations, ...currentEntry.stack],
             })
@@ -174,12 +175,22 @@ export function interpreteQueueRecursive(
                         raw: options.cloneValue(nextEntry.value.raw),
                         variables: { ...nextEntry.value.variables, index },
                     },
+                    seed: nextEntry.seed,
                     id: `${nextEntry.id}${index}`,
                     stack: [nextTransformation, ...nextEntry.stack],
                 })
             }
         } else {
-            interpreteTransformation(queue, descriptions, options, nextEntry.value, transformation, nextQueued)
+            interpreteTransformation(
+                queue,
+                descriptions,
+                options,
+                nextEntry.id,
+                nextEntry.value,
+                nextEntry.seed,
+                transformation,
+                nextQueued
+            )
         }
         nextEntry = queue.peek()
     }
@@ -213,26 +224,28 @@ function interpreteTransformation<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedTransformation,
     next: NextCallback<R>
 ): R {
     switch (transformation.type) {
         case "operation":
-            return interpreteOperation(queue, descriptions, options, value, transformation, next)
+            return interpreteOperation(queue, descriptions, options, id, value, seed, transformation, next)
         case "precomputedOperation":
-            return interpretePrecomputedOperation(queue, descriptions, options, value, transformation, next)
+            return interpretePrecomputedOperation(queue, descriptions, options, id, value, seed, transformation, next)
         case "raw":
-            return interpreteRaw(queue, descriptions, options, value, transformation, next)
+            return interpreteRaw(queue, descriptions, options, id, value, seed, transformation, next)
         case "sequential":
-            return interpreteSequential(queue, descriptions, options, value, transformation, next)
+            return interpreteSequential(queue, descriptions, options, id, value, seed, transformation, next)
         case "nounReference":
-            return interpreteNounReference(queue, descriptions, options, value, transformation, next)
+            return interpreteNounReference(queue, descriptions, options, id, value, seed, transformation, next)
         case "this":
-            return interpreteThis(queue, descriptions, options, value, next)
+            return interpreteThis(queue, descriptions, options, id, value, seed, next)
         case "-()":
         case "!":
-            return interpreteUnaryOperator(queue, descriptions, options, value, transformation, next)
+            return interpreteUnaryOperator(queue, descriptions, options, id, value, seed, transformation, next)
         case "+":
         case "&&":
         case "/":
@@ -246,22 +259,24 @@ function interpreteTransformation<R>(
         case "<=":
         case "-":
         case "!=":
-            return interpreteBinaryOperator(queue, descriptions, options, value, transformation, next)
+            return interpreteBinaryOperator(queue, descriptions, options, id, value, seed, transformation, next)
         case "if":
-            return interpreteIf(queue, descriptions, options, value, transformation, next)
+            return interpreteIf(queue, descriptions, options, id, value, seed, transformation, next)
         case "switch":
-            return interpreteSwitch(queue, descriptions, options, value, transformation, next)
+            return interpreteSwitch(queue, descriptions, options, id, value, seed, transformation, next)
         case "getVariable":
-            return interpreteGetVariable(queue, descriptions, options, value, transformation, next)
+            return interpreteGetVariable(queue, descriptions, options, id, value, seed, transformation, next)
         case "setVariable":
-            return interpreteSetVariable(queue, descriptions, options, value, transformation, next)
+            return interpreteSetVariable(queue, descriptions, options, id, value, seed, transformation, next)
         case "stochasticSwitch":
-            return interpreteStochasticSwitch(queue, descriptions, options, value, transformation, next)
+            return interpreteStochasticSwitch(queue, descriptions, options, id, value, seed, transformation, next)
     }
     throw new Error(`unknown transformation type "${transformation.type}"`)
 }
 
 const nextSynchronous = (
+    id: string,
+    seed: string,
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
@@ -276,7 +291,7 @@ const nextSynchronous = (
         value.raw = newRaw
     }
     for (const transformation of newTransformations) {
-        interpreteTransformationSynchronous(queue, descriptions, options, value, transformation)
+        interpreteTransformationSynchronous(queue, descriptions, options, id, value, seed, transformation)
     }
     return value
 }
@@ -285,21 +300,34 @@ export function interpreteTransformationSynchronous(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedTransformation
 ): Value {
-    return interpreteTransformation(queue, descriptions, options, value, transformation, nextSynchronous)
+    return interpreteTransformation(
+        queue,
+        descriptions,
+        options,
+        id,
+        value,
+        seed,
+        transformation,
+        nextSynchronous.bind(null, id, seed)
+    )
 }
 
 function interpreteStochasticSwitch<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedStochasticSwitch,
     next: NextCallback<R>
 ): R {
-    const rand = Math.random() // murmurhash.v3(value.variables.index ?? "", options.seed) / _32bit_max_int
+    const rand = cyrb53Random(id + seed)
 
     let sum = 0
     let i = -1
@@ -317,7 +345,9 @@ function interpreteGetVariable<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedGetVariable,
     next: NextCallback<R>
 ): R {
@@ -332,7 +362,9 @@ function interpreteSetVariable<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedSetVariable,
     next: NextCallback<R>
 ): R {
@@ -340,7 +372,9 @@ function interpreteSetVariable<R>(
         queue,
         descriptions,
         options,
+        id,
         { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
+        seed,
         transformation.children[0]
     )
     return next(queue, descriptions, options, value, undefined)
@@ -350,7 +384,9 @@ function interpreteSwitch<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedSwitch,
     next: NextCallback<R>
 ): R {
@@ -358,7 +394,9 @@ function interpreteSwitch<R>(
         queue,
         descriptions,
         options,
+        id,
         { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
+        seed,
         transformation.children[0]
     )
     for (let i = 0; i < transformation.cases.length; i++) {
@@ -374,7 +412,9 @@ function interpreteNounReference<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedNounReference,
     next: NextCallback<R>
 ): R {
@@ -392,7 +432,9 @@ function interpreteIf<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedIf,
     next: NextCallback<R>
 ): R {
@@ -400,7 +442,9 @@ function interpreteIf<R>(
         queue,
         descriptions,
         options,
+        id,
         { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
+        seed,
         transformation.children[0]
     )
     if (conditionOperatorValue.raw) {
@@ -414,7 +458,9 @@ function interpreteSequential<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedSequantial,
     next: NextCallback<R>
 ): R {
@@ -425,7 +471,9 @@ function interpreteBinaryOperator<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedBinaryOperator,
     next: NextCallback<R>
 ): R {
@@ -434,7 +482,9 @@ function interpreteBinaryOperator<R>(
             queue,
             descriptions,
             options,
+            id,
             { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
+            seed,
             child
         )
     )
@@ -445,7 +495,9 @@ function interpreteOperation<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedOperation,
     next: NextCallback<R>
 ): R {
@@ -460,7 +512,9 @@ function interpreteOperation<R>(
                 queue,
                 descriptions,
                 options,
+                id,
                 { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
+                seed,
                 child
             )
         )
@@ -475,6 +529,7 @@ function interpreteOperation<R>(
     return operation.execute(
         next.bind(null, queue, descriptions, options, value),
         transformation.astId!,
+        id + seed,
         ...parameters
     ) as R
 }
@@ -483,7 +538,9 @@ function interpretePrecomputedOperation<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedPrecomputedOperation,
     next: NextCallback<R>
 ): R {
@@ -501,6 +558,7 @@ function interpretePrecomputedOperation<R>(
     return operation.execute(
         next.bind(null, queue, descriptions, options, value),
         transformation.astId!,
+        id + seed,
         ...parameters
     ) as R
 }
@@ -509,7 +567,9 @@ function interpreteRaw<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: ParsedRaw,
     next: NextCallback<R>
 ): R {
@@ -525,7 +585,9 @@ function interpreteUnaryOperator<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     transformation: NestedUnaryOperator,
     next: NextCallback<R>
 ): R {
@@ -533,7 +595,9 @@ function interpreteUnaryOperator<R>(
         queue,
         descriptions,
         options,
+        id,
         { raw: options.cloneValue(value.raw), variables: { ...value.variables } },
+        seed,
         transformation.children[0]
     )
     return next(queue, descriptions, options, value, unaryOperations[transformation.type](parameter.raw))
@@ -559,7 +623,9 @@ function interpreteThis<R>(
     queue: Queue,
     descriptions: NestedDescriptions,
     options: InterpreterOptions,
+    id: string,
     value: Value,
+    seed: string,
     next: NextCallback<R>
 ): R {
     return next(queue, descriptions, options, value, undefined)

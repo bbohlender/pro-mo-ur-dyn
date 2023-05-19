@@ -15,8 +15,15 @@ import {
     QuaternionKeyframeTrack,
     SphereGeometry,
     Vector3,
+    Vector4Tuple,
 } from "three"
-import { MotionEntity, getEntityPositionAt, getEntityRotationAt, getKeyframeIndex } from "pro-3d-video/motion"
+import {
+    MotionEntity,
+    getEntityPositionAt,
+    getEntityRotationAt,
+    getKeyframeIndex,
+    getRotationPeriod,
+} from "pro-3d-video/motion"
 import { DerivedSelectionState, PrimarySelectionState, updateTime, useStore } from "../../state/store.js"
 import { useModel } from "./use-model.js"
 import { useTexture } from "@react-three/drei"
@@ -219,7 +226,7 @@ export async function exportMotion(objects: Array<Object3D>, tracks: Array<Keyfr
                 new VectorKeyframeTrack(
                     `motion-entity-${i}.position`,
                     entity.keyframes.map(({ t }) => t),
-                    entity.keyframes.reduce<Array<number>>((prev, { x, y, z }) => {
+                    entity.keyframes.reduce<Array<number>>((prev, { position: [x, y, z] }) => {
                         prev.push(x, y + 0.15, z)
                         return prev
                     }, [])
@@ -230,18 +237,28 @@ export async function exportMotion(objects: Array<Object3D>, tracks: Array<Keyfr
                 entity.keyframes.length > 1
                     ? new QuaternionKeyframeTrack(
                           `motion-entity-${i}.quaternion`,
-                          entity.keyframes.slice(0, -1).map(({ t }) => t),
-                          entity.keyframes.slice(0, -1).reduce<Array<number>>((prev, k1, i) => {
-                              const k2 = entity.keyframes[i + 1]
-                              vectorHelper1.set(k1.x, k1.y, k1.z)
-                              vectorHelper2.set(k2.x, k2.y, k2.z)
-                              vectorHelper2.sub(vectorHelper1)
-                              vectorHelper2.normalize()
-                              quaternionHelper.setFromUnitVectors(ZAXIS, vectorHelper2)
+                          entity.keyframes.reduce<Array<number>>((prev, { t, rotation }, i) => {
+                              const nextKeyframe = entity.keyframes[Math.min(i + 1, entity.keyframes.length - 1)]
+                              const rotationPeriod = getRotationPeriod(
+                                  rotation,
+                                  t,
+                                  nextKeyframe.rotation,
+                                  nextKeyframe.t
+                              )
+                              prev.push(t, t + rotationPeriod)
+                              return prev
+                          }, []),
+                          entity.keyframes.reduce<Array<number>>((prev, keyframe, i) => {
+                              const nextRotation = entity.keyframes[Math.min(i + 1, entity.keyframes.length - 1)].rotation
+                              const prevRotation = i === 0 ? nextRotation : keyframe.rotation
                               if (entity.type === "camera") {
-                                  quaternionHelper.multiply(rotateY180)
+                                  prev.push(
+                                      ...fixCameraRotation(prevRotation),
+                                      ...fixCameraRotation(nextRotation)
+                                  )
+                              } else {
+                                  prev.push(...prevRotation, ...nextRotation)
                               }
-                              prev.push(...quaternionHelper.toArray())
                               return prev
                           }, []),
                           InterpolateLinear
@@ -250,4 +267,10 @@ export async function exportMotion(objects: Array<Object3D>, tracks: Array<Keyfr
             )
             .filter(filterNull)
     )
+}
+
+function fixCameraRotation(rotation: Vector4Tuple) {
+    quaternionHelper.set(...rotation)
+    quaternionHelper.multiply(rotateY180)
+    return quaternionHelper.toArray()
 }

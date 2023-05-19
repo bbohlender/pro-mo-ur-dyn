@@ -40,7 +40,8 @@ THREE.Cache.enabled = true
 //    return of([new PointPrimitive(makeTranslationMatrix(x, y, z, instance.matrix.clone()), redMaterialGenerator)])
 //}
 
-function computePoint2(next: OperationNextCallback, astId: string, primitive: Primitive, x: number, z: number): any {
+function computePoint2(next: OperationNextCallback, astId: string,
+    seed: string, primitive: Primitive, x: number, z: number): any {
     primitive.matrix.multiply(makeTranslationMatrix(x, 0, z))
     return next(new PointPrimitive(primitive.matrix))
 }
@@ -50,6 +51,7 @@ const helperVector = new Vector3()
 function computeFace(
     next: OperationNextCallback,
     astId: string,
+    seed: string,
     instance: Primitive,
     ...points: ReadonlyArray<Primitive>
 ): any {
@@ -67,14 +69,15 @@ function computeFace(
     return next(new FacePrimitive(instance.matrix, new Shape(points2d)))
 }
 
-function computeSample(next: OperationNextCallback, astId: string, instance: Primitive, amount: number): any {
-    return next(instance.samplePoints(amount))
-}
+//function computeSample(next: OperationNextCallback, astId: string, instance: Primitive, amount: number): any {
+//    return next(instance.samplePoints(amount))
+//}
 
 const size = new Vector3()
 const box3Helper = new Box3()
 
-function computeSize(next: OperationNextCallback, astId: string, instance: Primitive, axis: "x" | "y" | "z"): any {
+function computeSize(next: OperationNextCallback, astId: string,
+    seed: string, instance: Primitive, axis: "x" | "y" | "z"): any {
     instance.getBoundingBox(box3Helper)
     box3Helper.getSize(size)
     return next(size[axis])
@@ -83,6 +86,7 @@ function computeSize(next: OperationNextCallback, astId: string, instance: Primi
 function computeScale(
     next: OperationNextCallback,
     astId: string,
+    seed: string,
     instance: Primitive,
     x: number,
     y: number,
@@ -99,6 +103,7 @@ function degreeToRadians(degree: number): number {
 function computeRotate(
     next: OperationNextCallback,
     astId: string,
+    seed: string,
     instance: Primitive,
     x: number,
     y: number,
@@ -111,6 +116,7 @@ function computeRotate(
 function computeTranslate(
     next: OperationNextCallback,
     astId: string,
+    seed: string,
     primitive: Primitive,
     x: number,
     y: number,
@@ -120,7 +126,8 @@ function computeTranslate(
     return next(primitive)
 }
 
-function computeExtrude(next: OperationNextCallback, astId: string, instance: Primitive, by: number): any {
+function computeExtrude(next: OperationNextCallback, astId: string,
+    seed: string, instance: Primitive, by: number): any {
     return next(instance.extrude(by))
 }
 
@@ -128,6 +135,7 @@ function computeComponents(
     type: "points" | "lines" | "faces",
     next: OperationNextCallback,
     astId: string,
+    seed: string,
     ...instances: Array<Primitive>
 ): any {
     const components = instances.reduce<Array<Primitive>>(
@@ -142,6 +150,7 @@ const ZAXIS = new Vector3(0, 0, 1)
 function computeSplit(
     next: OperationNextCallback,
     astId: string,
+    seed: string,
     instance: Primitive,
     axis: Axis,
     repetitions: boolean | number,
@@ -169,7 +178,8 @@ function computeSplit(
     return next(splits)
 }
 
-function computeDirection(next: OperationNextCallback, astId: string, instance: Primitive): any {
+function computeDirection(next: OperationNextCallback, astId: string,
+    seed: string, instance: Primitive): any {
     return next(getDirection(instance.matrix))
 }
 
@@ -226,12 +236,12 @@ export const operations: Operations = {
         includeQueue: false,
         defaultParameters: [],
     },
-    sample: {
-        execute: computeSample,
-        includeThis: true,
-        includeQueue: false,
-        defaultParameters: [() => ({ type: "raw", value: 10 })],
-    },
+    //sample: {
+    //    execute: computeSample,
+    //    includeThis: true,
+    //    includeQueue: false,
+    //    defaultParameters: [() => ({ type: "raw", value: 10 })],
+    //},
     size: {
         execute: computeSize,
         includeThis: true,

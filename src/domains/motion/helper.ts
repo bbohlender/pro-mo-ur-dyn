@@ -1,4 +1,4 @@
-import { Quaternion, Vector3 } from "three"
+import { Quaternion, Vector3, Vector4Tuple } from "three"
 import { Keyframe } from "./index.js"
 
 const helperVector1 = new Vector3()
@@ -30,28 +30,55 @@ export function getKeyframeIndex(keyframes: Array<Keyframe>, time: number, toler
  * @returns false if the requested time lies outside the provided keyframes
  */
 export function getEntityPositionAt(keyframes: Array<Keyframe>, time: number, index: number, target: Vector3): void {
-    const { x: x1, y: y1, z: z1, t: t1 } = keyframes[index]
-    if (keyframes.length === 1) {
-        target.set(x1, y1, z1)
+    const { position: p1, t: t1 } = keyframes[index]
+    if (index + 1 >= keyframes.length) {
+        target.set(...p1)
         return
     }
-    helperVector1.set(x1, y1, z1)
-    const { x: x2, y: y2, z: z2, t: t2 } = keyframes[index + 1]
-    target.set(x2, y2, z2)
+    helperVector1.set(...p1)
+    const { position: p2, t: t2 } = keyframes[index + 1]
+    target.set(...p2)
     const percent = (time - t1) / (t2 - t1)
     target.sub(helperVector1).multiplyScalar(percent).add(helperVector1)
 }
 
-const ZAXIS = new Vector3(0, 0, 1)
+const rotationSpeed = 2 //radians / s
+
+const q1 = new Quaternion()
+const q2 = new Quaternion()
+
+export function getRotationPeriod(
+    prevRotation: Vector4Tuple,
+    prevTime: number,
+    rotation: Vector4Tuple,
+    time: number
+): number {
+    const prevAngle = Math.abs(angleBetween(prevRotation, rotation))
+    return Math.min(prevAngle / rotationSpeed, time - prevTime)
+}
 
 export function getEntityRotationAt(keyframes: Array<Keyframe>, time: number, index: number, target: Quaternion): void {
-    if (keyframes.length === 1) {
+    const { rotation, t } = keyframes[Math.min(index + 1, keyframes.length - 1)]
+
+    const prevKeyframe = keyframes[index]
+    const prevRotation = prevKeyframe.rotation
+    const prevTime = prevKeyframe.t
+    const currentPeriod = time - prevTime
+
+    const rotationPeriod = getRotationPeriod(prevRotation, prevTime, rotation, t)
+
+    if (index === 0 || currentPeriod >= rotationPeriod) {
+        target.set(...rotation)
         return
     }
-    const { x: x1, y: y1, z: z1, t: t1 } = keyframes[index]
-    helperVector1.set(x1, y1, z1)
-    const { x: x2, y: y2, z: z2, t: t2 } = keyframes[index + 1]
-    helperVector2.set(x2, y2, z2)
-    helperVector2.sub(helperVector1).normalize()
-    target.setFromUnitVectors(ZAXIS, helperVector2)
+
+    target.set(...prevRotation)
+    q2.set(...rotation)
+    target.slerp(q2, currentPeriod / rotationPeriod)
+}
+
+function angleBetween(a1: Vector4Tuple, a2: Vector4Tuple): number {
+    q1.set(...a1)
+    q2.set(...a2)
+    return q1.angleTo(q2)
 }

@@ -1,4 +1,4 @@
-import { BufferAttribute, BufferGeometry, InterleavedBufferAttribute, Triangle, Vector3 } from "three"
+/*import { BufferAttribute, BufferGeometry, InterleavedBufferAttribute, Triangle, Vector3 } from "three"
 
 export function getTriangle(
     faceIndex: number,
@@ -80,3 +80,4 @@ function randomIndexBySize(sizes: Array<number>, sum: number): number {
     }
     return sizes.length - 1
 }
+*/
