@@ -54,6 +54,7 @@ export type AppState = {
         ratio: number
         offset: number
     }>
+    allDurations: { [key: string]: number }
     onUpdateRequestedTimeSet: Set<(requestedTime: number) => void>
     deriveThresholdFootwalk: number
     deriveThresholdStreet: number
@@ -66,6 +67,7 @@ export type AppState = {
     playing: boolean
     result: any
     interpretationFinished: boolean
+    allInterpretationFinished: { [key: string]: boolean }
     textEdit: boolean
     primarySelection: PrimarySelectionState
     derivedSelection: DerivedSelectionState
@@ -131,6 +133,118 @@ export const useStore = createZustand(
             })
         },
 
+        addProceduralAgents(amount: number, type: string, moveOn: string): void {
+            let name = `procedural${type}`
+            const { descriptions } = get()
+            while (
+                Object.values(descriptions.descriptions).find((description) => description.identifier === name) != null
+            ) {
+                name += "'"
+            }
+            this.addDescriptions({
+                [name]: {
+                    initialVariables: { type },
+                    nouns: {
+                        Start: {
+                            transformation: {
+                                type: "sequential",
+                                children: [
+                                    {
+                                        type: "operation",
+                                        identifier: "spawnOn",
+                                        children: [
+                                            {
+                                                type: "raw",
+                                                value: moveOn,
+                                            },
+                                            {
+                                                type: "raw",
+                                                value: amount,
+                                            },
+                                        ],
+                                    },
+                                    {
+                                        type: "nounReference",
+                                        descriptionIdentifier: name,
+                                        nounIdentifier: "Loop",
+                                    },
+                                ],
+                            },
+                        },
+                        Loop: {
+                            transformation: {
+                                type: "sequential",
+                                children: [
+                                    {
+                                        type: "operation",
+                                        identifier: "pathOnToAndDodge",
+                                        children: [
+                                            {
+                                                type: "raw",
+                                                value: moveOn,
+                                            },
+                                            {
+                                                type: "operation",
+                                                identifier: "randomPointOn",
+                                                children: [
+                                                    {
+                                                        type: "raw",
+                                                        value: moveOn,
+                                                    },
+                                                ],
+                                            },
+                                        ],
+                                    },
+                                    {
+                                        type: "nounReference",
+                                        descriptionIdentifier: name,
+                                        nounIdentifier: "Loop",
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                    rootNounIdentifier: "Start",
+                },
+            })
+        },
+
+        follow(id: string): void {
+            console.log(id)
+            this.addDescriptions({
+                [`FollowCamera${id}`]: {
+                    initialVariables: { type: "camera" },
+                    nouns: {
+                        Start: {
+                            transformation: {
+                                type: "operation",
+                                identifier: "follow",
+                                children: [
+                                    {
+                                        type: "raw",
+                                        value: id,
+                                    },
+                                    {
+                                        type: "raw",
+                                        value: 0,
+                                    },
+                                    {
+                                        type: "raw",
+                                        value: 8,
+                                    },
+                                    {
+                                        type: "raw",
+                                        value: 0,
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                    rootNounIdentifier: "Start",
+                },
+            })
+        },
+
         selectDescription(descriptionId: string): void {
             set({ selectedDescriptionId: descriptionId })
         },
@@ -140,8 +254,14 @@ export const useStore = createZustand(
                 this.updateDescriptions(flattenAST(parsedResult), { textEdit: false })
                 return
             }
+            const nested = nestAST(get().descriptions, true)
+            for (const [key, value] of Object.entries(nested)) {
+                if (value.astId === descriptionId) {
+                    delete nested[key]
+                }
+            }
             Object.values(parsedResult)[0].astId = descriptionId
-            this.updateDescriptions(flattenAST({ ...nestAST(get().descriptions, true), ...parsedResult }), {
+            this.updateDescriptions(flattenAST({ ...nested, ...parsedResult }), {
                 textEdit: false,
             })
         },
@@ -401,7 +521,35 @@ export const useStore = createZustand(
         },
 
         enterMultiScenario(): void {
-            set({ mode: "multi" })
+            set({ mode: "multi", allDurations: {}, allInterpretationFinished: {} })
+        },
+
+        getDuration(): number {
+            const state = get()
+            if (state.mode != "multi") {
+                return state.duration
+            }
+            let max = state.duration
+            for (const duration of Object.values(state.allDurations)) {
+                max = Math.max(duration, max)
+            }
+            return max
+        },
+
+        getInterpretationFinished(): boolean {
+            const state = get()
+            if (state.mode != "multi") {
+                return state.interpretationFinished
+            }
+            if (!state.interpretationFinished) {
+                return false
+            }
+            for (const finished of Object.values(state.allInterpretationFinished)) {
+                if (!finished) {
+                    return false
+                }
+            }
+            return true
         },
 
         setDeriveThresholdFootwalk(threshold: number): void {
@@ -555,13 +703,13 @@ export const useStore = createZustand(
 
         addDescriptions(nestedDescriptions: NestedDescriptions, partial?: Partial<AppState>) {
             this.updateDescriptions(
-                flattenAST({ ...nestedDescriptions, ...nestAST(get().descriptions, true) }),
+                flattenAST({ ...nestAST(get().descriptions, true), ...nestedDescriptions }),
                 partial
             )
         },
 
         setTime(time: number) {
-            set({ time: clamp(time, 0, get().duration), playing: false })
+            set({ time: clamp(time, 0, this.getDuration()), playing: false })
         },
     }))
 )
@@ -741,15 +889,15 @@ function setOrAdd(map: Map<string, Array<Array<Keyframe>>>, key: string, value: 
 export function updateTime(delta: number) {
     const state = useStore.getState()
 
-    if (state.playing && state.time < state.duration) {
-        state.time = state.duration === 0 ? 0 : state.time + delta
-        if (state.interpretationFinished) {
-            state.time %= state.duration
+    if (state.playing && state.time < state.getDuration()) {
+        state.time = state.time + delta
+        if (state.getInterpretationFinished()) {
+            state.time %= state.getDuration()
         }
     }
 
     //more than 80% of the timeline is played
-    if (!state.interpretationFinished && state.time > state.requestedDuration * 0.8) {
+    if (!state.getInterpretationFinished() && state.time > state.requestedDuration * 0.8) {
         state.requestedDuration = state.requestedDuration * 2
         for (const onUpdateRequestedTime of state.onUpdateRequestedTimeSet) {
             onUpdateRequestedTime(state.requestedDuration)
@@ -768,6 +916,7 @@ function createInitialState(): AppState {
         deriveThresholdFootwalk: 0.5,
         deriveThresholdStreet: 0.5,
         deriveThresholdBuildings: 0.5,
+        allDurations: {},
         time: 0,
         duration: 0,
         playing: true,
@@ -776,6 +925,7 @@ function createInitialState(): AppState {
         requestedDuration,
         textEdit: false,
         primarySelection: {},
+        allInterpretationFinished: {},
         derivedSelection: { keyframes: [], astIds: [], keyframeIndiciesMap: new Map() },
         shift: false,
         controlling: false,

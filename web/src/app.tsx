@@ -1,6 +1,6 @@
-import { Canvas } from "@react-three/fiber"
+import { Canvas, useFrame } from "@react-three/fiber"
 import { Interface2D } from "./components/interface-2d.js"
-import { useStore } from "./state/store.js"
+import { updateTime, useStore } from "./state/store.js"
 import { DragEvent, useEffect, useMemo, useState } from "react"
 import { ParsedDescriptions, WorkerInterface, nestAST, parse } from "pro-3d-video"
 import { useKeyboard } from "./components/use-keyboard.js"
@@ -51,6 +51,7 @@ function SingleView() {
             gl={{ logarithmicDepthBuffer: true, antialias: true }}
             camera={{ far: 10000 }}
             style={{ width: "100vw", height: "100svh" }}>
+            <Updater />
             {mode === "edit" && <Paths />}
             {mode === "edit" && <PathControl />}
             {mode === "derive" && (
@@ -119,21 +120,43 @@ export function MultiView() {
     return (
         <div className="flex flex-wrap flex-row h-full">
             {concreteDescriptions.map((description, i) => (
-                <Canvas
-                    gl={{ logarithmicDepthBuffer: true, antialias: true }}
-                    key={i}
-                    camera={{ far: 10000 }}
-                    style={{ maxWidth: size, maxHeight: size }}>
-                    <ViewDescriptions descriptions={description} />
-                </Canvas>
+                <MultiViewer key={i} index={i} description={description} size={size} />
             ))}
+        </div>
+    )
+}
+
+function Updater() {
+    useFrame((_, delta) => {
+        updateTime(delta)
+    })
+    return null
+}
+
+function MultiViewer({ description, index, size }: { index: number; description: ParsedDescriptions; size: string }) {
+    const [finalDuration, setFinalDuration] = useState<number | undefined>(undefined)
+    return (
+        <div className="relative w-full h-full" style={{ maxWidth: size, maxHeight: size }}>
+            <Canvas gl={{ logarithmicDepthBuffer: true, antialias: true }} camera={{ far: 10000 }}>
+                {index === 0 && <Updater />}
+                <ViewDescriptions setFinalDuration={setFinalDuration} index={index} descriptions={description} />
+            </Canvas>
+            {finalDuration != null && <div className="top-1 right-1 absolute z-10">Duration: {finalDuration}</div>}
         </div>
     )
 }
 
 const loader = new BufferGeometryLoader()
 
-function ViewDescriptions({ descriptions }: { descriptions: ParsedDescriptions }) {
+function ViewDescriptions({
+    descriptions,
+    index,
+    setFinalDuration,
+}: {
+    descriptions: ParsedDescriptions
+    index: number
+    setFinalDuration?: (duration: number) => void
+}) {
     const [result, setResult] = useState<any>(undefined)
     useEffect(() => {
         const workerInterface = new WorkerInterface(
@@ -142,13 +165,20 @@ function ViewDescriptions({ descriptions }: { descriptions: ParsedDescriptions }
                 name: generateUUID(),
                 type: "module",
             },
-            ({ agents = [], building, footwalk, street }: any) =>
+            ({ agents = [], building, footwalk, street }: any, duration: number, isFinal) => {
+                const state = useStore.getState()
+                state.allDurations[index] = duration
+                state.allInterpretationFinished[index] = isFinal
+                if (isFinal && setFinalDuration != null) {
+                    setFinalDuration(duration)
+                }
                 setResult({
                     agents,
                     building: building == null ? undefined : loader.parse(building),
                     street: street == null ? undefined : loader.parse(street),
                     footwalk: footwalk == null ? undefined : loader.parse(footwalk),
                 })
+            }
         )
         workerInterface.interprete(nestAST(descriptions, true), useStore.getState().requestedDuration)
         const onUpdateRequestedTime = (requestedTime: number) => {

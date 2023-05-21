@@ -16,7 +16,7 @@ export function PlayerControls() {
             if (barRef.current == null) {
                 return
             }
-            const fraction = useStore.getState().time / Math.max(0.00001, useStore.getState().duration)
+            const fraction = useStore.getState().time / Math.max(0.00001, useStore.getState().getDuration())
             barRef.current.style.width = `${(fraction * 100).toFixed(3)}%`
         })
         return () => clearInterval(interval)
@@ -82,12 +82,12 @@ function Time() {
 }
 
 function Duration() {
-    const duration = useStore((state) => state.duration.toFixed(2))
+    const duration = useStore((state) => state.getDuration().toFixed(2))
     return <div style={{ minWidth: "3rem", maxWidth: "3rem" }}>{duration}</div>
 }
 
 function setTime(e: React.PointerEvent<HTMLDivElement>) {
     const { left, width } = e.currentTarget.getBoundingClientRect()
     const state = useStore.getState()
-    state.setTime(((e.clientX - left) / width) * state.duration)
+    state.setTime(((e.clientX - left) / width) * state.getDuration())
 }

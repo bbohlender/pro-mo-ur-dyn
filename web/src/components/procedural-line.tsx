@@ -10,7 +10,7 @@ const xPadding = 1
 const fontSize = 1
 const circleSize = 0.8
 
-const textWidth = 6
+const textWidth = 9
 
 export function ProceduralLine() {
     const panelRef = useRef<HTMLDivElement>(null)
@@ -19,6 +19,12 @@ export function ProceduralLine() {
     const agentsLength = useStore((state) => state.result.agents?.length ?? 0) as number
 
     const functions = useMemo(() => {
+        let followTextIndex = 0
+        const followTexts: Array<SVGTextElement> = []
+
+        let followRectsIndex = 0
+        const followRects: Array<SVGRectElement> = []
+
         let textsIndex = 0
         const texts: Array<SVGTextElement> = []
 
@@ -32,6 +38,33 @@ export function ProceduralLine() {
         const rects: Array<SVGRectElement> = []
 
         return {
+            createFollowText() {
+                if (followTextIndex < followTexts.length) {
+                    const text = followTexts[followTextIndex++]
+                    text.setAttribute("visibility", "visible")
+                    return text
+                }
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text")
+                text.innerHTML = "Follow"
+                followTexts.push(text)
+                svgTextRef.current!.appendChild(text)
+                return text
+            },
+            createFollowRect() {
+                let rect: SVGRectElement
+                if (followRectsIndex < followRects.length) {
+                    rect = followRects[followRectsIndex++]
+                    rect.setAttribute("visibility", "visible")
+                    rect.remove()
+                } else {
+                    rect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+                    followRects.push(rect)
+                }
+                svgTextRef.current!.prepend(rect)
+
+                return rect
+            },
+
             createText() {
                 if (textsIndex < texts.length) {
                     const text = texts[textsIndex++]
@@ -83,6 +116,12 @@ export function ProceduralLine() {
                 return rect
             },
             reset() {
+                for (const rect of followRects) {
+                    rect.setAttribute("visibility", "hidden")
+                }
+                for (const text of followTexts) {
+                    text.setAttribute("visibility", "hidden")
+                }
                 for (const rect of rects) {
                     rect.setAttribute("visibility", "hidden")
                 }
@@ -99,6 +138,8 @@ export function ProceduralLine() {
                 circlesIndex = 0
                 rectsIndex = 0
                 textRectsIndex = 0
+                followRectsIndex = 0
+                followTextIndex = 0
             },
         }
     }, [])
@@ -140,7 +181,9 @@ export function ProceduralLine() {
                     functions.createText,
                     functions.createTextRect,
                     functions.createCircle,
-                    functions.createRect
+                    functions.createRect,
+                    functions.createFollowText,
+                    functions.createFollowRect
                 )
             }
         }, 30)
@@ -183,7 +226,9 @@ function updateEntitiyLine(
     createText: () => SVGTextElement,
     createTextRect: () => SVGRectElement,
     createCircle: () => SVGCircleElement,
-    createRect: () => SVGRectElement
+    createRect: () => SVGRectElement,
+    createFollowText: () => SVGTextElement,
+    createFollowRect: () => SVGRectElement
 ): void {
     const lineStartY = entityIndex * lineHeight
 
@@ -193,11 +238,28 @@ function updateEntitiyLine(
         const textBg = createTextRect()
         textBg.setAttribute("x", rem(xPadding - 0.5))
         textBg.setAttribute("y", rem(yPadding + lineStartY - 0.5))
-        textBg.setAttribute("width", rem(textWidth - 2 * (xPadding - 0.5)))
+        textBg.setAttribute("width", rem(textWidth - 2 * (xPadding - 0.5) - 5))
         textBg.setAttribute("height", rem(fontSize + 1))
         textBg.setAttribute("rx", "5")
         textBg.setAttribute("fill", "aqua")
     }
+
+    const followBG = createFollowRect()
+    followBG.setAttribute("x", rem(xPadding - 0.5 + 4))
+    followBG.setAttribute("y", rem(yPadding + lineStartY - 0.5))
+    followBG.setAttribute("width", rem(textWidth - 2 * (xPadding - 0.5) - 4))
+    followBG.setAttribute("height", rem(fontSize + 1))
+    followBG.setAttribute("rx", "5")
+    followBG.setAttribute("fill", "black")
+
+    const followText = createFollowText()
+    followText.onclick = () => {
+        useStore.getState().follow(entity.id)
+    }
+    followText.setAttribute("x", rem(xPadding + 4))
+    followText.setAttribute("y", rem(yPadding + lineStartY + fontSize))
+    followText.setAttribute("fontSize", rem(fontSize))
+    followText.setAttribute("fill", "white")
 
     const text = createText()
     text.innerHTML = entity.id

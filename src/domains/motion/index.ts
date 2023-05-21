@@ -6,38 +6,38 @@ import { findPathTo, randomPointOn } from "./pathfinding.js"
 import { NestedTransformation, filterNull } from "../../index.js"
 
 const TIME_STEP = 0.1 //ms
-export const rotationSpeed = 0.7 //radians / s
+export const rotationSpeed = 1.4 //radians / s
 
 export const entityTypeDefaults = {
     pedestrian: {
         url: "models/human",
         radius: 1,
-        speed: 1.5,
+        speed: 3,
     },
     car: {
         url: "models/car",
-        speed: 10,
+        speed: 18,
         radius: 3,
     },
     bus: {
         url: "models/bus",
-        speed: 7,
+        speed: 12,
         radius: 5,
     },
     train: {
         url: "models/train",
-        speed: 17,
+        speed: 18,
         radius: 5,
     },
     cyclist: {
         url: "models/cyclist",
         radius: 2,
-        speed: 3.5,
+        speed: 6,
     },
     camera: {
         url: undefined,
         radius: 0,
-        speed: 5,
+        speed: 10,
     },
 }
 
@@ -92,12 +92,15 @@ export const operations: Operations = {
                 )
             }
 
-            entity.keyframes.splice(-1, 1)
-            const { speed, t: currentTime } = entity.keyframes[entity.keyframes.length - 1]
+            const speed = entity.keyframes[entity.keyframes.length - 1].speed
+
+            const newKeyframes = entity.keyframes.slice(0, -1)
+            const currentTime = newKeyframes[newKeyframes.length - 1]?.t as number | undefined
 
             //add all missing keyframes to this target with a very small delay (+ 0.01) and with the astId
-            for (const keyframe of target.keyframes) {
-                if (keyframe.t < currentTime) {
+            for (let i = 0; i < target.keyframes.length; i++) {
+                const keyframe = target.keyframes[i]
+                if (currentTime != null && keyframe.t < currentTime) {
                     continue
                 }
                 positionHelper
@@ -107,13 +110,17 @@ export const operations: Operations = {
                             .set(offsetX, offsetY, offsetZ)
                             .applyQuaternion(quaternionHelper.set(...keyframe.rotation))
                     )
-                entity.keyframes.push({
+                newKeyframes.push({
                     astId,
                     speed,
                     t: keyframe.t + 0.01,
                     position: positionHelper.toArray(),
                     rotation: keyframe.rotation,
                 })
+            }
+
+            if (newKeyframes.length > 0) {
+                entity.keyframes = newKeyframes
             }
 
             const latestTime = entity.keyframes[entity.keyframes.length - 1].t
@@ -250,6 +257,14 @@ export const operations: Operations = {
         },
         includeQueue: true,
         includeThis: true,
+    },
+    target: {
+        defaultParameters: [],
+        execute: (next, astId, seed, x = 0, y = 0, z = 0) => {
+            return next({ x, y, z })
+        },
+        includeQueue: false,
+        includeThis: false,
     },
     pathOnTo: {
         defaultParameters: [],

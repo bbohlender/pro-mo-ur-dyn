@@ -12,6 +12,7 @@ import {
 } from "../state/mapbox.js"
 import { exportGeometryResult } from "./viewer/geometry-result.js"
 import { exportMotion } from "./viewer/agents.js"
+import { useRef } from "react"
 
 export function Toolbar() {
     return (
@@ -37,6 +38,22 @@ export function Toolbar() {
                 className="btn btn-outline border-slate-300 btn-sm">
                 Delete Agents
             </div>
+            <NumberInputAndButton
+                onClick={(amount) => useStore.getState().addProceduralAgents(amount, "pedestrian", "footwalk")}
+                label="Add Pro. Pedestrians"
+            />
+            <NumberInputAndButton
+                onClick={(amount) => useStore.getState().addProceduralAgents(amount, "cyclist", "street")}
+                label="Add Pro. Cyclist"
+            />
+            <NumberInputAndButton
+                onClick={(amount) => useStore.getState().addProceduralAgents(amount, "car", "street")}
+                label="Add Pro. Cars"
+            />
+            <NumberInputAndButton
+                onClick={(amount) => useStore.getState().addProceduralAgents(amount, "bus", "street")}
+                label="Add Pro. Busses"
+            />
             <div
                 onClick={() => useStore.getState().enterDeriveBuildingsAndPathways()}
                 className="btn btn-outline border-slate-300 btn-sm">
@@ -54,10 +71,30 @@ export function Toolbar() {
     )
 }
 
+function NumberInputAndButton({ label, onClick }: { label: string; onClick: (value: number) => void }) {
+    const ref = useRef<HTMLInputElement>(null)
+    return (
+        <div className="form-control basis-0">
+            <div className="input-group basis-0">
+                <input
+                    ref={ref}
+                    type="number"
+                    defaultValue={10}
+                    style={{ maxWidth: "5rem" }}
+                    className="input input-bordered"
+                />
+                <button onClick={() => onClick(ref.current!.valueAsNumber)} className="btn flex-grow">
+                    {label}
+                </button>
+            </div>
+        </div>
+    )
+}
+
 const gltfExporter = new GLTFExporter()
 
 async function exportScene() {
-    const { duration } = useStore.getState()
+    const duration = useStore.getState().getDuration()
 
     const objects: Array<Object3D> = []
     const tracks: Array<KeyframeTrack> = []

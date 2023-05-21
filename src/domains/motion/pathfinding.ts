@@ -26,8 +26,9 @@ export function findPathTo(
     }
     const groupId = 0
     fromHelper.set(...from.position)
-    const { centroid } = pathfinding.getClosestNode(fromHelper, ZONE, groupId)
-    return pathfinding.findPath(centroid, toHelper.set(x, y, z), ZONE, groupId)
+    const { centroid: fromCentroid } = pathfinding.getClosestNode(fromHelper, ZONE, groupId)
+    const { centroid: toCentroid } = pathfinding.getClosestNode(toHelper.set(x, y, z), ZONE, groupId)
+    return pathfinding.findPath(fromCentroid, toCentroid, ZONE, groupId)
 }
 
 export function randomPointOn(
