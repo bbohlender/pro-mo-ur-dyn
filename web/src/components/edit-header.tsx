@@ -3,6 +3,7 @@ import { Panel } from "./panel.js"
 
 export function EditHeader() {
     const keyframesAmount = useStore((state) => state.derivedSelection.keyframes.length)
+    const resultIds = useStore((state) => Array.from(state.derivedSelection.keyframeIndiciesMap.keys()))
 
     return (
         <Panel className="rounded gap-3 p-3 flex flex-row items-center">
@@ -18,6 +19,13 @@ export function EditHeader() {
             <div onClick={() => useStore.getState().exitEdit()} className="btn btn-outline border-slate-300 btn-sm">
                 Exit
             </div>
+            {resultIds.length === 1 && (
+                <div
+                    onClick={() => useStore.getState().follow(resultIds[0])}
+                    className="btn btn-outline border-slate-300 btn-sm">
+                    Follow
+                </div>
+            )}
         </Panel>
     )
 }

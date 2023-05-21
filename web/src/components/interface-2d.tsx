@@ -61,13 +61,8 @@ function Text() {
                         </a>
                     ))}
                 </div>
-                <div className="btn-group my-1 mx-3 flex-shrink-0">
-                    <button className="btn btn-primary btn-xs" onClick={downloadText}>
-                        <ArrowDownIcon height={16} />
-                    </button>
-                    <div onClick={() => useStore.getState().addDescription()} className="btn btn-primary btn-xs">
-                        <PlusIcon height={20} />
-                    </div>
+                <div onClick={() => useStore.getState().addDescription()} className="btn btn-circle mx-3 my-1 btn-primary btn-xs">
+                    <PlusIcon height={20} />
                 </div>
             </div>
             {selectedDescriptionId != null ? (
@@ -81,13 +76,4 @@ function Text() {
             )}
         </Panel>
     )
-}
-
-async function downloadText() {
-    const text = serializeString(useStore.getState().descriptions)
-
-    const a = document.createElement("a")
-    a.href = window.URL.createObjectURL(new Blob([text], { type: "text/plain" }))
-    a.download = `scene.cgv`
-    a.click()
 }

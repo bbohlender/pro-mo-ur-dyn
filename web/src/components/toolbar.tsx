@@ -1,5 +1,5 @@
 import { useStore } from "../state/store.js"
-import { NestedDescriptions, parse } from "pro-3d-video"
+import { NestedDescriptions, parse, serializeString } from "pro-3d-video"
 import { Panel } from "./panel.js"
 import simplify from "simplify-js"
 import { AnimationClip, KeyframeTrack, Object3D } from "three"
@@ -12,81 +12,130 @@ import {
 } from "../state/mapbox.js"
 import { exportGeometryResult } from "./viewer/geometry-result.js"
 import { exportMotion } from "./viewer/agents.js"
-import { useRef } from "react"
+import { PropsWithChildren, useRef, useState } from "react"
 
 export function Toolbar() {
     return (
-        <Panel className="rounded gap-3 p-3 flex flex-col">
-            <div onClick={() => importAgents(0.2, 0.1)} className="btn btn-outline border-slate-300 btn-sm">
-                Import Agents
-            </div>
-            <div onClick={importBuildingsPathways} className="btn btn-outline border-slate-300 btn-sm">
-                Import Buildings & Pathways
-            </div>
-            <div
-                onClick={() => useStore.getState().deleteType("building")}
-                className="btn btn-outline border-slate-300 btn-sm">
-                Delete Buildings
-            </div>
-            <div
-                onClick={() => useStore.getState().deleteType("footwalk", "street")}
-                className="btn btn-outline border-slate-300 btn-sm">
-                Delete Pathways
-            </div>
-            <div
-                onClick={() => useStore.getState().deleteType(undefined, "pedestrian", "cyclist", "bus", "car")}
-                className="btn btn-outline border-slate-300 btn-sm">
-                Delete Agents
-            </div>
-            <NumberInputAndButton
-                onClick={(amount) => useStore.getState().addProceduralAgents(amount, "pedestrian", "footwalk")}
-                label="Add Pro. Pedestrians"
-            />
-            <NumberInputAndButton
-                onClick={(amount) => useStore.getState().addProceduralAgents(amount, "cyclist", "street")}
-                label="Add Pro. Cyclist"
-            />
-            <NumberInputAndButton
-                onClick={(amount) => useStore.getState().addProceduralAgents(amount, "car", "street")}
-                label="Add Pro. Cars"
-            />
-            <NumberInputAndButton
-                onClick={(amount) => useStore.getState().addProceduralAgents(amount, "bus", "street")}
-                label="Add Pro. Busses"
-            />
-            <div
-                onClick={() => useStore.getState().enterDeriveBuildingsAndPathways()}
-                className="btn btn-outline border-slate-300 btn-sm">
-                Derive Buildings & Pathways
-            </div>
-            <div
-                onClick={() => useStore.getState().enterMultiScenario()}
-                className="btn btn-outline border-slate-300 btn-sm">
-                View Scenarios
-            </div>
-            <div onClick={exportScene} className="btn btn-outline border-slate-300 btn-sm">
-                Export
-            </div>
+        <Panel className="navbar overflow-visible flex-wrap">
+            <DropdownItem label="Import">
+                <div onClick={() => importAgents(0.2, 0.1)} className="btn btn-outline border-slate-300 btn-sm">
+                    Agents
+                </div>
+                <div
+                    onClick={() => importBuildingsPathways("new-york.mvt")}
+                    className="btn btn-outline border-slate-300 btn-sm">
+                    New York
+                </div>
+                <div
+                    onClick={() => importBuildingsPathways("frankfurt.mvt")}
+                    className="btn btn-outline border-slate-300 btn-sm">
+                    Frankfurt
+                </div>
+            </DropdownItem>
+            <DropdownItem label="Delete">
+                <div
+                    onClick={() => useStore.getState().deleteType("building")}
+                    className="btn btn-outline border-slate-300 btn-sm">
+                    Buildings
+                </div>
+                <div
+                    onClick={() => useStore.getState().deleteType("footwalk", "street")}
+                    className="btn btn-outline border-slate-300 btn-sm">
+                    Pathways
+                </div>
+                <div
+                    onClick={() => useStore.getState().deleteType(undefined, "pedestrian", "cyclist", "bus", "car")}
+                    className="btn btn-outline border-slate-300 btn-sm">
+                    Agents
+                </div>
+            </DropdownItem>
+            <DropdownItem label="Add">
+                <NumberInputAndButton
+                    onClick={(amount) => useStore.getState().addProceduralAgents(amount, "pedestrian", "footwalk")}
+                    label="Pro. Pedestrians"
+                />
+                <NumberInputAndButton
+                    onClick={(amount) => useStore.getState().addProceduralAgents(amount, "cyclist", "street")}
+                    label="Pro. Cyclist"
+                />
+                <NumberInputAndButton
+                    onClick={(amount) => useStore.getState().addProceduralAgents(amount, "car", "street")}
+                    label="Pro. Cars"
+                />
+                <NumberInputAndButton
+                    onClick={(amount) => useStore.getState().addProceduralAgents(amount, "bus", "street")}
+                    label="Pro. Busses"
+                />
+            </DropdownItem>
+            <DropdownItem label="Derive">
+                <div
+                    onClick={() => useStore.getState().enterDeriveBuildingsAndPathways()}
+                    className="btn btn-outline border-slate-300 btn-sm"
+                    style={{ lineHeight: 1.5, height: "3rem" }}>
+                    Buildings & Pathways
+                </div>
+            </DropdownItem>
+            <DropdownItem label="View">
+                <div
+                    onClick={() => useStore.getState().enterMultiScenario()}
+                    className="btn btn-outline border-slate-300 btn-sm">
+                    Scenarios
+                </div>
+            </DropdownItem>
+            <DropdownItem label="Download">
+                <div onClick={exportScene} className="btn btn-outline border-slate-300 btn-sm">
+                    .GLB
+                </div>
+                <div onClick={downloadText} className="btn btn-outline border-slate-300 btn-sm">
+                    .CGV
+                </div>
+            </DropdownItem>
         </Panel>
     )
+}
+
+function DropdownItem({ children, label }: PropsWithChildren<{ label: string }>) {
+    const [open, setOpen] = useState(false)
+    return (
+        <div className="dropdown dropdown-open" onPointerOver={() => setOpen(true)} onPointerOut={() => setOpen(false)}>
+            <label className="btn btn-ghost">{label}</label>
+            {open && (
+                <div
+                    onClick={() => setOpen(false)}
+                    style={{ minWidth: "13rem" }}
+                    className="dropdown-content flex flex-col p-2 shadow bg-base-100 rounded-box gap-2">
+                    {children}
+                </div>
+            )}
+        </div>
+    )
+}
+
+async function downloadText() {
+    const text = serializeString(useStore.getState().descriptions)
+
+    const a = document.createElement("a")
+    a.href = window.URL.createObjectURL(new Blob([text], { type: "text/plain" }))
+    a.download = `scene.cgv`
+    a.click()
 }
 
 function NumberInputAndButton({ label, onClick }: { label: string; onClick: (value: number) => void }) {
     const ref = useRef<HTMLInputElement>(null)
     return (
-        <div className="form-control basis-0">
-            <div className="input-group basis-0">
-                <input
-                    ref={ref}
-                    type="number"
-                    defaultValue={10}
-                    style={{ maxWidth: "5rem" }}
-                    className="input input-bordered"
-                />
-                <button onClick={() => onClick(ref.current!.valueAsNumber)} className="btn flex-grow">
-                    {label}
-                </button>
-            </div>
+        <div className="input-group flex flex-row">
+            <input
+                ref={ref}
+                type="number"
+                defaultValue={10}
+                style={{ width: "5rem" }}
+                className="input input-bordered"
+            />
+            <button
+                onClick={() => onClick(ref.current!.valueAsNumber)}
+                className="btn btn-outline border-slate-300 border-l-0 flex-grow whitespace-nowrap">
+                {label}
+            </button>
         </div>
     )
 }
@@ -123,8 +172,8 @@ const defaultDescription = parse(`Default (type: "building", interprete: false) 
     Building--> this
 }`)
 
-async function importBuildingsPathways() {
-    const layers = await loadMapLayers("_18-77198-98516.mvt", 98516, 18)
+async function importBuildingsPathways(url: string) {
+    const layers = await loadMapLayers(url, 98516, 18)
     useStore.getState().addDescriptions({
         ...defaultDescription,
         ...convertLotsToDescriptions(layers),
@@ -185,7 +234,7 @@ async function importAgents(spaceScale: number, timeScale: number) {
         }
         const simplifiedKeyframes = simplify(
             keyframes.map((data) => ({ ...getCenter(data), t: data.t })),
-            2
+            1
         ) as Array<{
             x: number
             y: number

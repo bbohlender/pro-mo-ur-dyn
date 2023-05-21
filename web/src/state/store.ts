@@ -210,7 +210,6 @@ export const useStore = createZustand(
         },
 
         follow(id: string): void {
-            console.log(id)
             this.addDescriptions({
                 [`FollowCamera${id}`]: {
                     initialVariables: { type: "camera" },

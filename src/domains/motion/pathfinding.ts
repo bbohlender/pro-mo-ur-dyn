@@ -24,11 +24,24 @@ export function findPathTo(
     if (pathfinding == null) {
         return undefined
     }
-    const groupId = 0
     fromHelper.set(...from.position)
-    const { centroid: fromCentroid } = pathfinding.getClosestNode(fromHelper, ZONE, groupId)
-    const { centroid: toCentroid } = pathfinding.getClosestNode(toHelper.set(x, y, z), ZONE, groupId)
-    return pathfinding.findPath(fromCentroid, toCentroid, ZONE, groupId)
+    let clostestCentroid: Vector3 | undefined
+    let clostestDistance: number | undefined
+    let closestGroupId: number | undefined
+    for (let groupId = 0; groupId < pathfinding.zones[ZONE].groups.length; groupId++) {
+        const { centroid } = pathfinding.getClosestNode(fromHelper, ZONE, groupId)
+        const distance = fromHelper.distanceTo(centroid)
+        if (clostestDistance == null || distance < clostestDistance) {
+            clostestDistance = distance
+            clostestCentroid = centroid
+            closestGroupId = groupId
+        }
+    }
+    if (clostestCentroid == null || closestGroupId == null) {
+        return undefined
+    }
+    const { centroid: toCentroid } = pathfinding.getClosestNode(toHelper.set(x, y, z), ZONE, closestGroupId)
+    return pathfinding.findPath(clostestCentroid, toCentroid, ZONE, closestGroupId)
 }
 
 export function randomPointOn(
@@ -42,21 +55,23 @@ export function randomPointOn(
     if (pathfinding == null) {
         return false
     }
-    const groups: Array<Array<{ centroid: Vector3 }>> = pathfinding.zones[ZONE].groups
-    const allLength = groups.reduce((prev, g) => prev + g.length, 0)
-    let selectedIndex = Math.floor(allLength * cyrb53Random(seed))
-    let groupIndex = 0
-    while (groupIndex < groups.length) {
-        const groupLength = groups[groupIndex].length
-        if (selectedIndex >= groupLength) {
-            groupIndex++
-            selectedIndex -= groupLength
-            continue
+    let clostestDistance: number | undefined
+    let closestGroupId: number | undefined
+    for (let groupId = 0; groupId < pathfinding.zones[ZONE].groups.length; groupId++) {
+        const { centroid } = pathfinding.getClosestNode(fromHelper, ZONE, groupId)
+        const distance = fromHelper.distanceTo(centroid)
+        if (clostestDistance == null || distance < clostestDistance) {
+            clostestDistance = distance
+            closestGroupId = groupId
         }
-        target.copy(groups[groupIndex][selectedIndex].centroid)
-        return true
     }
-    return false
+    if (closestGroupId == null) {
+        return false
+    }
+    const group: Array<{ centroid: Vector3 }> = pathfinding.zones[ZONE].groups[closestGroupId]
+    let selectedIndex = Math.floor(group.length * cyrb53Random(seed))
+    target.copy(group[selectedIndex].centroid)
+    return true
 }
 
 function getPathfinding(

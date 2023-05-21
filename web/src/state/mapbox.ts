@@ -70,7 +70,10 @@ export function convertPathwaysToDescription(
                 transformation: {
                     type: "parallel",
                     children: layers["road"]
-                        .filter((feature) => classes.includes(feature.properties.class))
+                        .filter(
+                            (feature) =>
+                                feature.properties.structure != "tunnel" && classes.includes(feature.properties.class)
+                        )
                         .reduce<Array<NestedTransformation>>((prev, feature) => {
                             prev.push(
                                 ...feature.geometry.map<NestedTransformation>((polygon) =>
@@ -233,7 +236,12 @@ export function convertLotsToDescriptions(layers: Layers): NestedDescriptions {
                 {
                     type: "operation",
                     identifier: "extrude",
-                    children: [{ type: "raw", value: feature.properties.height }],
+                    children: [
+                        {
+                            type: "raw",
+                            value: feature.properties.height === 3 ? Math.random() * 10 + 2 : feature.properties.height,
+                        },
+                    ],
                 },
                 { type: "nounReference", nounIdentifier: "Building", descriptionIdentifier: "Default" }
             )

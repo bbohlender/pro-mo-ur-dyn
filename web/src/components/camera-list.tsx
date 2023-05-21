@@ -13,7 +13,7 @@ export function CameraList() {
         state.viewType === "camera" ? (state as any as CameraViewerState).resultId : undefined
     )
     return (
-        <div className="flex flex-col overflow-y-auto flex-shrink gap-3">
+        <div className="flex flex-col overflow-y-auto flex-shrink gap-3" style={{ maxWidth: "12rem" }}>
             {cameraIds?.map((cameraId) => {
                 const selected = cameraId === selectedCameraId
                 return (
