@@ -21,18 +21,29 @@ export function findPathTo(
     z: number
 ): Array<Vector3> | undefined {
     const pathfinding = getPathfinding(queue, type, radius)
-    const groupId = pathfinding.getGroup(ZONE, toHelper.set(x, y, z))
-    return pathfinding.findPath(fromHelper.set(...from.position), toHelper, ZONE, groupId)
+    if (pathfinding == null) {
+        return undefined
+    }
+    const groupId = 0
+    fromHelper.set(...from.position)
+    const { centroid } = pathfinding.getClosestNode(fromHelper, ZONE, groupId)
+    return pathfinding.findPath(centroid, toHelper.set(x, y, z), ZONE, groupId)
 }
 
-export function randomPointOn(queue: Queue, type: string, radius: number, seed: string): Vector3 {
+export function randomPointOn(
+    queue: Queue,
+    type: string,
+    radius: number,
+    seed: string,
+    target = new Vector3()
+): boolean {
     const pathfinding = getPathfinding(queue, type, radius)
+    if (pathfinding == null) {
+        return false
+    }
     const groups: Array<Array<{ centroid: Vector3 }>> = pathfinding.zones[ZONE].groups
     const allLength = groups.reduce((prev, g) => prev + g.length, 0)
-    if (allLength == 0) {
-        return new Vector3()
-    }
-    let selectedIndex = Math.floor(allLength * cyrb53Random( seed))
+    let selectedIndex = Math.floor(allLength * cyrb53Random(seed))
     let groupIndex = 0
     while (groupIndex < groups.length) {
         const groupLength = groups[groupIndex].length
@@ -41,16 +52,30 @@ export function randomPointOn(queue: Queue, type: string, radius: number, seed: 
             selectedIndex -= groupLength
             continue
         }
-        return groups[groupIndex][selectedIndex].centroid.clone()
+        target.copy(groups[groupIndex][selectedIndex].centroid)
+        return true
     }
-    throw new Error(`selected index bigger all length`)
+    return false
 }
 
-function getPathfinding(queue: Queue, type: string, radius: number): any {
+function getPathfinding(
+    queue: Queue,
+    type: string,
+    radius: number
+):
+    | {
+          findPath: Function
+          getClosestNode: Function
+          zones: { [key: string]: { groups: Array<Array<{ centroid: Vector3 }>> } }
+      }
+    | undefined {
     return queue.getCached(`${type}-pathfinding-radius-${radius}`, () => {
         const geometry = queue.getCached(`${type}-radius-${radius}`, (results) =>
             pathwaysToGeometry(results.map(({ raw }) => raw).filter(isPathway), type, radius * -2)
         )
+        if (geometry == null) {
+            return undefined
+        }
         const pathfinding = new Pathfinding()
         const zone = Pathfinding.createZone(geometry)
         pathfinding.setZoneData(ZONE, zone)

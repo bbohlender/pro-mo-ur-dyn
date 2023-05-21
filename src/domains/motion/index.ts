@@ -1,11 +1,12 @@
 import { Quaternion, Vector3, Vector3Tuple, Vector4Tuple } from "three"
 import { OperationNextCallback, Operations } from "../../interpreter/index.js"
-import { getEntityPositionAt, getEntityRotationAt, getKeyframeIndex } from "./helper.js"
+import { angleBetween, getEntityPositionAt, getEntityRotationAt, getKeyframeIndex } from "./helper.js"
 import { Queue } from "../../interpreter/queue.js"
 import { findPathTo, randomPointOn } from "./pathfinding.js"
-import { NestedTransformation } from "../../index.js"
+import { NestedTransformation, filterNull } from "../../index.js"
 
 const TIME_STEP = 0.1 //ms
+export const rotationSpeed = 0.7 //radians / s
 
 export const entityTypeDefaults = {
     pedestrian: {
@@ -15,23 +16,23 @@ export const entityTypeDefaults = {
     },
     car: {
         url: "models/car",
-        speed: 17,
-        radius: 2.5,
+        speed: 10,
+        radius: 3,
     },
     bus: {
         url: "models/bus",
-        speed: 14,
-        radius: 3,
+        speed: 7,
+        radius: 5,
     },
     train: {
         url: "models/train",
         speed: 17,
-        radius: 3,
+        radius: 5,
     },
     cyclist: {
         url: "models/cyclist",
-        radius: 1.5,
-        speed: 4,
+        radius: 2,
+        speed: 3.5,
     },
     camera: {
         url: undefined,
@@ -72,70 +73,62 @@ export const operations: Operations = {
                 queue.results.find(({ id, raw }) => id === targetId && isMotionEntity(raw))?.raw
 
             const nextFollowTransformation: NestedTransformation = {
-                type: "operation",
+                type: "precomputedOperation",
                 identifier: "follow",
                 astId,
-                children: [targetId, offsetX, offsetY, offsetZ].map((value) => ({ type: "raw", value })),
+                parameters: [targetId, offsetX, offsetY, offsetZ],
             }
 
             if (target == null) {
                 return next(
                     entity,
                     {
-                        type: "operation",
+                        type: "precomputedOperation",
                         astId,
                         identifier: "wait",
-                        children: [{ type: "raw", value: 0.01 }],
+                        parameters: [0.01],
                     },
                     nextFollowTransformation
                 )
             }
 
-            const lastKeyframe = entity.keyframes[entity.keyframes.length - 1]
-            const currentTime = lastKeyframe.t
-            const speed = lastKeyframe.speed
-
-            const index = getKeyframeIndex(target.keyframes, currentTime, 0)
-
-            if (index == null) {
-                return next(
-                    entity,
-                    {
-                        type: "operation",
-                        astId,
-                        identifier: "wait",
-                        children: [{ type: "raw", value: 0.01 }],
-                    },
-                    nextFollowTransformation
-                )
-            }
-
-            getEntityPositionAt(target.keyframes, currentTime, index, positionHelper)
-            getEntityRotationAt(target.keyframes, currentTime, index, quaternionHelper)
-            entity.keyframes.push({
-                astId,
-                speed,
-                t: currentTime + 0.01,
-                position: [positionHelper.x + offsetX, positionHelper.y + offsetY, positionHelper.z + offsetZ],
-                rotation: quaternionHelper.toArray() as Vector4Tuple,
-            })
+            entity.keyframes.splice(-1, 1)
+            const { speed, t: currentTime } = entity.keyframes[entity.keyframes.length - 1]
 
             //add all missing keyframes to this target with a very small delay (+ 0.01) and with the astId
             for (const keyframe of target.keyframes) {
                 if (keyframe.t < currentTime) {
                     continue
                 }
+                positionHelper
+                    .set(...keyframe.position)
+                    .add(
+                        deltaHelper
+                            .set(offsetX, offsetY, offsetZ)
+                            .applyQuaternion(quaternionHelper.set(...keyframe.rotation))
+                    )
                 entity.keyframes.push({
                     astId,
                     speed,
                     t: keyframe.t + 0.01,
-                    position: [
-                        keyframe.position[0] + offsetX,
-                        keyframe.position[1] + offsetY,
-                        keyframe.position[2] + offsetZ,
-                    ],
+                    position: positionHelper.toArray(),
                     rotation: keyframe.rotation,
                 })
+            }
+
+            const latestTime = entity.keyframes[entity.keyframes.length - 1].t
+
+            if (latestTime === currentTime) {
+                return next(
+                    entity,
+                    {
+                        type: "precomputedOperation",
+                        astId,
+                        identifier: "wait",
+                        parameters: [0.01],
+                    },
+                    nextFollowTransformation
+                )
             }
 
             return next(entity, nextFollowTransformation)
@@ -161,7 +154,11 @@ export const operations: Operations = {
             const nextPosition: Vector3Tuple = [x, y, z]
             entity.keyframes.push({
                 position: nextPosition,
-                rotation: computeRotationFromKeyframes(position, nextPosition),
+                rotation: computeRotationFromKeyframes(
+                    position,
+                    nextPosition,
+                    quaternionHelper
+                ).toArray() as Vector4Tuple,
                 t: t + Math.max(0.01, dt),
                 astId,
                 speed,
@@ -198,13 +195,18 @@ export const operations: Operations = {
     randomPointOn: {
         defaultParameters: [],
         execute: (next, astId, seed: string, entity: MotionEntity, queue: Queue, type: string) => {
-            const { x, y, z } = randomPointOn(
-                queue,
-                type,
-                entity.radius,
-                seed + entity.keyframes[entity.keyframes.length - 1].t
-            )
-            return next({ x, y, z })
+            if (
+                !randomPointOn(
+                    queue,
+                    type,
+                    entity.radius,
+                    seed + entity.keyframes[entity.keyframes.length - 1].t,
+                    positionHelper
+                )
+            ) {
+                return next(undefined)
+            }
+            return next({ x: positionHelper.x, y: positionHelper.y, z: positionHelper.z })
         },
         includeQueue: true,
         includeThis: true,
@@ -218,11 +220,22 @@ export const operations: Operations = {
             entity: MotionEntity,
             queue: Queue,
             type: string,
-            { x, y, z }: { x: number; y: number; z: number }
+            target: { x: number; y: number; z: number } | undefined
         ) => {
+            const wait1Sec: NestedTransformation = {
+                type: "precomputedOperation",
+                identifier: "wait",
+                astId,
+                parameters: [1],
+            }
+            if (target == null) {
+                return next(wait1Sec)
+            }
             const keyframe = entity.keyframes[entity.keyframes.length - 1]
-            const path = findPathTo(queue, type, entity.radius, keyframe, x, y, z)
-            if (path != null) {
+            vectorHelper1.set(...keyframe.position)
+            let path = findPathTo(queue, type, entity.radius, keyframe, target.x, target.y, target.z)
+            path = path?.filter((position, i) => position.distanceTo(i === 0 ? vectorHelper1 : path![i - 1]) > 0.01)
+            if (path != null && path.length > 0) {
                 return next(
                     entity,
                     ...path.map<NestedTransformation>(({ x, y, z }) => ({
@@ -233,7 +246,7 @@ export const operations: Operations = {
                     }))
                 )
             }
-            return next(entity, { type: "operation", identifier: "wait", astId, children: [{ type: "raw", value: 1 }] })
+            return next(entity, wait1Sec)
         },
         includeQueue: true,
         includeThis: true,
@@ -247,11 +260,20 @@ export const operations: Operations = {
             entity: MotionEntity,
             queue: Queue,
             type: string,
-            { x, y, z }: { x: number; y: number; z: number }
+            target: { x: number; y: number; z: number } | undefined
         ) => {
+            const wait1Sec: NestedTransformation = {
+                type: "precomputedOperation",
+                identifier: "wait",
+                astId,
+                parameters: [1],
+            }
+            if (target == null) {
+                return next(entity, wait1Sec)
+            }
             const keyframe = entity.keyframes[entity.keyframes.length - 1]
             vectorHelper1.set(...keyframe.position)
-            let path = findPathTo(queue, type, entity.radius, keyframe, x, y, z)
+            let path = findPathTo(queue, type, entity.radius, keyframe, target.x, target.y, target.z)
             path = path?.filter((position, i) => position.distanceTo(i === 0 ? vectorHelper1 : path![i - 1]) > 0.01)
             if (path != null && path.length > 0) {
                 return next(
@@ -264,7 +286,7 @@ export const operations: Operations = {
                     }))
                 )
             }
-            return next(entity, { type: "operation", identifier: "wait", astId, children: [{ type: "raw", value: 1 }] })
+            return next(entity, wait1Sec)
         },
         includeQueue: true,
         includeThis: true,
@@ -272,12 +294,31 @@ export const operations: Operations = {
     spawnOn: {
         defaultParameters: [],
         execute: (next, astId, seed, entity: MotionEntity, queue: Queue, type = "street", amount = 1) => {
+            const environment = queue.list.map(({ value: { raw } }) => raw).concat(queue.results.map(({ raw }) => raw))
             const keyframe = entity.keyframes[entity.keyframes.length - 1]
+            let i = 0
+            const points: Array<Vector3Tuple> = []
+
+            outer: for (let x = 0; x < amount; x++) {
+                do {
+                    if (i > 10000) {
+                        break outer
+                    }
+                    if (!randomPointOn(queue, type, entity.radius, seed + keyframe.t + i, vectorHelper1)) {
+                        break outer
+                    }
+                    i++
+                } while (
+                    hasCollisionWithOtherSimilarEntities(vectorHelper1, entity.radius, points) ||
+                    hasCollisionWithAnyOtherEntitiy(vectorHelper1, entity, environment, keyframe.t)
+                )
+                points.push(vectorHelper1.toArray())
+            }
             return next(
-                new Array(amount).fill(null).map<MotionEntity>((_, i) => ({
+                points.map((position) => ({
                     keyframes: [
                         {
-                            position: randomPointOn(queue, type, entity.radius, seed + i + keyframe.t).toArray(),
+                            position,
                             rotation: defaultRotation,
                             astId,
                             t: keyframe.t,
@@ -328,7 +369,11 @@ export const operations: Operations = {
             const nextPosition: Vector3Tuple = [position[0] + dx, position[1] + dy, position[2] + dz]
             entity.keyframes.push({
                 position: nextPosition,
-                rotation: computeRotationFromKeyframes(position, nextPosition),
+                rotation: computeRotationFromKeyframes(
+                    position,
+                    nextPosition,
+                    quaternionHelper
+                ).toArray() as Vector4Tuple,
                 t: t + dt,
                 astId,
                 speed,
@@ -350,88 +395,124 @@ export const operations: Operations = {
             targetY: number,
             targetZ: number
         ) => {
-            const { position, t, speed } = entity.keyframes[entity.keyframes.length - 1]
-            let dx = targetX - position[0]
-            let dy = targetY - position[1]
-            let dz = targetZ - position[2]
-            const fullDistanceLength = distanceTo(dx, dy, dz)
-            const stepDistance = Math.min(TIME_STEP * speed, fullDistanceLength)
-            //normalise and apply the step size
-            if (fullDistanceLength === 0) {
-                dx = 0
-                dy = 0
-                dz = 0
-            } else {
-                dx = (dx / fullDistanceLength) * stepDistance
-                dy = (dy / fullDistanceLength) * stepDistance
-                dz = (dz / fullDistanceLength) * stepDistance
-            }
-
-            const newX = position[0] + dx
-            const newY = position[1] + dy
-            const newZ = position[2] + dz
-
-            let nextX = position[0],
-                nextY = position[1],
-                nextZ = position[2]
-            const nextT = t + Math.max(0.01, stepDistance / speed)
-            if (
-                !isColliding(
-                    entity,
-                    queue.list.map(({ value: { raw } }) => raw).concat(queue.results.map(({ raw }) => raw)),
-                    positionHelper.set(newX, newY, newZ),
-                    nextT
-                )
-            ) {
-                //not collide
-                nextX = newX
-                nextY = newY
-                nextZ = newZ
-            }
-
-            const nextPosition: Vector3Tuple = [nextX, nextY, nextZ]
-
-            entity.keyframes.push({
-                position: nextPosition,
-                rotation: computeRotationFromKeyframes(position, nextPosition),
-                t: nextT,
-                astId,
-                speed,
-            })
-
-            if (fullDistanceLength <= stepDistance) {
-                return next(entity) //done
-            }
-            return next(entity, {
+            const nextMoveToTransformation: NestedTransformation = {
                 type: "precomputedOperation",
                 identifier: "moveToAndDodge",
                 parameters: [targetX, targetY, targetZ],
                 astId,
-            }) //schedule again
+            }
+            const lastKeyframe = entity.keyframes[entity.keyframes.length - 1]
+            const { position, rotation, speed, t } = lastKeyframe
+            deltaHelper.set(targetX - position[0], targetY - position[1], targetZ - position[2])
+            const fullDistanceLength = deltaHelper.length()
+            const stepDistance = Math.min(TIME_STEP * speed, fullDistanceLength)
+            //normalise and apply the step size
+            if (fullDistanceLength === 0) {
+                deltaHelper.set(0, 0, 0)
+            } else {
+                deltaHelper.multiplyScalar(stepDistance / fullDistanceLength)
+            }
+
+            const nextT = t + Math.max(0.01, stepDistance / speed)
+
+            const environment = queue.list.map(({ value: { raw } }) => raw).concat(queue.results.map(({ raw }) => raw))
+
+            nextPositionHelper.set(...position)
+            nextQuaternionHelper.set(...rotation)
+
+            const clostestEntity = getClostestEntity(entity, environment, nextPositionHelper, nextT)
+
+            if (clostestEntity != null && clostestEntity.distance < entity.radius * 2) {
+                const clostestEntityOnRightSide =
+                    toRightHelper
+                        .set(1, 0, 0)
+                        .applyQuaternion(nextQuaternionHelper)
+                        .dot(clostestEntity.directionVector) >= 0
+                nextQuaternionHelper.multiply(clostestEntityOnRightSide ? toLeftRotation : toRightRotation)
+                deltaHelper.set(0, 0, 1).multiplyScalar(stepDistance).applyQuaternion(nextQuaternionHelper)
+                nextPositionHelper.add(deltaHelper)
+
+                const clostestEntityAfter = getClostestEntity(entity, environment, nextPositionHelper, nextT)
+                if (clostestEntityAfter != null && clostestEntityAfter.distance <= 0) {
+                    nextPositionHelper.set(...position)
+                }
+            } else {
+                //just go forward
+                nextPositionHelper.add(deltaHelper)
+                computeRotationFromKeyframes(position, nextPositionHelper, nextQuaternionHelper)
+            }
+
+            const nextPosition = nextPositionHelper.toArray()
+            const nextRotation = nextQuaternionHelper.toArray() as Vector4Tuple
+
+            if (angleBetween(rotation, nextRotation) > degToRadians(3)) {
+                entity.keyframes.push({
+                    position: nextPosition,
+                    rotation: nextRotation,
+                    t: nextT,
+                    astId,
+                    speed,
+                })
+            } else {
+                nextPositionHelper.toArray(position)
+                lastKeyframe.t = nextT
+            }
+
+            if (Math.abs(fullDistanceLength - stepDistance) < entity.radius) {
+                return next(entity) //done
+            }
+
+            return next(entity, nextMoveToTransformation) //schedule again
         },
     },
 }
 
-const targetEntityPositionHelper = new Vector3()
-
-function isColliding(entity: MotionEntity, environment: Array<any>, position: Vector3, time: number) {
-    for (const value of environment) {
-        if (value != entity && isMotionEntity(value)) {
-            const index = getKeyframeIndex(value.keyframes, time, TIME_STEP + 0.001)
-            if (index == null) {
-                continue
-            }
-            getEntityPositionAt(value.keyframes, time, index, targetEntityPositionHelper)
-            const distance = position.distanceTo(targetEntityPositionHelper)
-            if (distance < value.radius + entity.radius) {
-                return true
-            }
-        }
-    }
-    return false
+function degToRadians(deg: number): number {
+    return (deg / 180) * Math.PI
 }
 
-const defaultRotation: Vector4Tuple = [1, 0, 0, 0]
+const YAXIS = new Vector3(0, 1, 0)
+const toRightRotation = new Quaternion().setFromAxisAngle(YAXIS, rotationSpeed * TIME_STEP)
+const toLeftRotation = toRightRotation.clone().invert()
+
+const nextPositionHelper = new Vector3()
+const nextQuaternionHelper = new Quaternion()
+const deltaHelper = new Vector3()
+const toRightHelper = new Vector3()
+
+const directionHelper = new Vector3()
+
+function getClostestEntity(entity: MotionEntity, environment: Array<any>, position: Vector3, time: number) {
+    let result: { entity: MotionEntity; distance: number; directionVector: Vector3 } | undefined
+    for (const value of environment) {
+        if (value == entity || !isMotionEntity(value) || value.type === "camera") {
+            continue
+        }
+        const index = getKeyframeIndex(value.keyframes, time, TIME_STEP + 0.001)
+        if (index == null) {
+            continue
+        }
+        getEntityPositionAt(value.keyframes, time, index, directionHelper)
+        directionHelper.sub(position)
+        let distance = directionHelper.length()
+        directionHelper.divideScalar(distance)
+
+        distance = Math.max(0, distance - entity.radius - value.radius)
+
+        if (result == null) {
+            result = { entity: value, distance, directionVector: directionHelper.clone() }
+            continue
+        }
+        if (distance < result.distance) {
+            result.distance = distance
+            result.directionVector.copy(directionHelper)
+            result.entity = value
+        }
+    }
+    return result
+}
+
+const defaultRotation: Vector4Tuple = [0, 0, 0, 1]
 
 const vectorHelper1 = new Vector3()
 const vectorHelper2 = new Vector3()
@@ -439,13 +520,55 @@ const quaternionHelper = new Quaternion()
 
 const ZAXIS = new Vector3(0, 0, 1)
 
-function computeRotationFromKeyframes(p1: Vector3Tuple, p2: Vector3Tuple) {
-    vectorHelper1.set(...p1)
-    vectorHelper2.set(...p2)
+function computeRotationFromKeyframes(
+    p1: Vector3Tuple | Vector3,
+    p2: Vector3Tuple | Vector3,
+    target = new Quaternion()
+): Quaternion {
+    Array.isArray(p1) ? vectorHelper1.set(...p1) : vectorHelper1.copy(p1)
+    Array.isArray(p2) ? vectorHelper2.set(...p2) : vectorHelper2.copy(p2)
     vectorHelper2.sub(vectorHelper1)
     vectorHelper2.normalize()
-    quaternionHelper.setFromUnitVectors(ZAXIS, vectorHelper2)
-    return quaternionHelper.toArray() as Vector4Tuple
+    target.setFromUnitVectors(ZAXIS, vectorHelper2)
+    return target
+}
+
+function hasCollisionWithOtherSimilarEntities(
+    position: Vector3,
+    radius: number,
+    otherPositions: Array<Vector3Tuple>
+): boolean {
+    const radiusTimes2 = radius * 2
+    for (const otherPosition of otherPositions) {
+        if (vectorHelper2.set(...otherPosition).distanceTo(position) < radiusTimes2) {
+            return true
+        }
+    }
+    return false
+}
+
+function hasCollisionWithAnyOtherEntitiy(
+    position: Vector3,
+    entity: MotionEntity,
+    environment: Array<any>,
+    time: number
+): boolean {
+    for (const value of environment) {
+        if (value === entity || !isMotionEntity(value)) {
+            continue
+        }
+
+        const index = getKeyframeIndex(value.keyframes, time, 0)
+        if (index == null) {
+            continue
+        }
+        getEntityPositionAt(value.keyframes, time, index, vectorHelper2)
+
+        if (vectorHelper2.distanceTo(position) < entity.radius + value.radius) {
+            return true
+        }
+    }
+    return false
 }
 
 export function createMotionEntitiy({ type, x, y, z, time }: any, astId: string): MotionEntity {

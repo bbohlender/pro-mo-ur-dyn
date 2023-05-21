@@ -182,6 +182,7 @@ export function AgentType({
 }
 
 const gltfLoader = new GLTFLoader()
+const animationSpeedup = 4
 
 export async function exportMotion(objects: Array<Object3D>, tracks: Array<KeyframeTrack>): Promise<void> {
     const motionEntities = useStore.getState().result.agents as Array<MotionEntity> | undefined
@@ -225,7 +226,7 @@ export async function exportMotion(objects: Array<Object3D>, tracks: Array<Keyfr
             (entity, i) =>
                 new VectorKeyframeTrack(
                     `motion-entity-${i}.position`,
-                    entity.keyframes.map(({ t }) => t),
+                    entity.keyframes.map(({ t }) => t / animationSpeedup),
                     entity.keyframes.reduce<Array<number>>((prev, { position: [x, y, z] }) => {
                         prev.push(x, y + 0.15, z)
                         return prev
@@ -237,25 +238,25 @@ export async function exportMotion(objects: Array<Object3D>, tracks: Array<Keyfr
                 entity.keyframes.length > 1
                     ? new QuaternionKeyframeTrack(
                           `motion-entity-${i}.quaternion`,
-                          entity.keyframes.reduce<Array<number>>((prev, { t, rotation }, i) => {
-                              const nextKeyframe = entity.keyframes[Math.min(i + 1, entity.keyframes.length - 1)]
-                              const rotationPeriod = getRotationPeriod(
-                                  rotation,
-                                  t,
-                                  nextKeyframe.rotation,
-                                  nextKeyframe.t
-                              )
-                              prev.push(t, t + rotationPeriod)
-                              return prev
-                          }, []),
+                          entity.keyframes
+                              .reduce<Array<number>>((prev, { t, rotation }, i) => {
+                                  const nextKeyframe = entity.keyframes[Math.min(i + 1, entity.keyframes.length - 1)]
+                                  const rotationPeriod = getRotationPeriod(
+                                      rotation,
+                                      t,
+                                      nextKeyframe.rotation,
+                                      nextKeyframe.t
+                                  )
+                                  prev.push(t, t + rotationPeriod)
+                                  return prev
+                              }, [])
+                              .map((t) => t / animationSpeedup),
                           entity.keyframes.reduce<Array<number>>((prev, keyframe, i) => {
-                              const nextRotation = entity.keyframes[Math.min(i + 1, entity.keyframes.length - 1)].rotation
+                              const nextRotation =
+                                  entity.keyframes[Math.min(i + 1, entity.keyframes.length - 1)].rotation
                               const prevRotation = i === 0 ? nextRotation : keyframe.rotation
                               if (entity.type === "camera") {
-                                  prev.push(
-                                      ...fixCameraRotation(prevRotation),
-                                      ...fixCameraRotation(nextRotation)
-                                  )
+                                  prev.push(...fixCameraRotation(prevRotation), ...fixCameraRotation(nextRotation))
                               } else {
                                   prev.push(...prevRotation, ...nextRotation)
                               }

@@ -57,6 +57,8 @@ function SingleView() {
                 <>
                     <DeriveVisualization
                         type="Footwalk"
+                        includeTypes={["pedestrian", undefined]}
+                        color="red"
                         position={[0, -0.2, 0]}
                         rotation={[-Math.PI / 2, 0, 0]}
                         size={50}
@@ -64,6 +66,17 @@ function SingleView() {
                     />
                     <DeriveVisualization
                         type="Street"
+                        includeTypes={["bus", "car", "cyclist"]}
+                        color="green"
+                        position={[0, -0.2, 0]}
+                        rotation={[-Math.PI / 2, 0, 0]}
+                        size={50}
+                        far={100}
+                    />
+                    <DeriveVisualization
+                        invert
+                        color="blue"
+                        type="Buildings"
                         position={[0, -0.2, 0]}
                         rotation={[-Math.PI / 2, 0, 0]}
                         size={50}

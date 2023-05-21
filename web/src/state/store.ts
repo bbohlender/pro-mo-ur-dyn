@@ -20,6 +20,10 @@ import { clamp, generateUUID } from "three/src/math/MathUtils.js"
 import { BufferGeometryLoader, Vector2Tuple } from "three"
 //@ts-ignore
 import Url from "./worker.js?url"
+//@ts-ignore
+import TraceSkeleton from "skeleton-tracing-wasm"
+//@ts-ignore
+import delauny from "delaunay-triangulate"
 
 const createZustand = create as any as typeof x.default
 
@@ -35,19 +39,25 @@ export type PrimarySelectionState = {
 
 export type AppState = {
     mode: "view" | "edit" | "derive" | "multi"
+    confirmDerivedBuildings?: () => Promise<{
+        imageData: ImageData
+        ratio: number
+        offset: number
+    }>
     confirmDerivedStreet?: () => Promise<{
-        polylines: Array<Array<Vector2Tuple>>
+        imageData: ImageData
         ratio: number
         offset: number
     }>
     confirmDerivedFootwalk?: () => Promise<{
-        polylines: Array<Array<Vector2Tuple>>
+        imageData: ImageData
         ratio: number
         offset: number
     }>
     onUpdateRequestedTimeSet: Set<(requestedTime: number) => void>
     deriveThresholdFootwalk: number
     deriveThresholdStreet: number
+    deriveThresholdBuildings: number
     descriptions: ParsedDescriptions
     workerInterface: WorkerInterface
     time: number
@@ -402,33 +412,104 @@ export const useStore = createZustand(
             set({ deriveThresholdStreet: threshold })
         },
 
+        setDeriveThresholdBuildings(threshold: number): void {
+            set({ deriveThresholdBuildings: threshold })
+        },
+
         async confirmDeriveBuildingsAndPathways(): Promise<void> {
             const footwalkResult = await get().confirmDerivedFootwalk?.()
             const streetResult = await get().confirmDerivedStreet?.()
+            const buildingsResult = await get().confirmDerivedBuildings?.()
 
-            if (footwalkResult == null || streetResult == null) {
+            if (footwalkResult == null || streetResult == null || buildingsResult == null) {
                 return
             }
 
-            this.addDescriptions(
-                {
-                    DerivedFootwalk: convertPathwaysToDescription(
-                        footwalkResult.polylines,
-                        3,
-                        "footwalk",
-                        footwalkResult.ratio,
-                        footwalkResult.offset
-                    ),
-                    DerivedStreet: convertPathwaysToDescription(
-                        streetResult.polylines,
-                        10,
-                        "street",
-                        streetResult.ratio,
-                        streetResult.offset
-                    ),
-                },
-                { mode: "view" }
-            )
+            const points: Array<Vector2Tuple> = []
+            let c = 0
+            let x: number
+            let y: number
+            outer: for (let i = 0; i < 50; i++) {
+                let point: Vector2Tuple = [0, 0]
+                do {
+                    if (c > 1000) {
+                        break outer
+                    }
+                    c++
+                    point[0] = buildingsResult.imageData.width * Math.random()
+                    point[1] = buildingsResult.imageData.height * Math.random()
+                    x = Math.floor(point[0])
+                    y = Math.floor(point[1])
+                } while (buildingsResult.imageData.data[(y * buildingsResult.imageData.width + x) * 4] < 100)
+                points.push(point)
+            }
+
+            const delaunyResults: Array<Array<number>> = delauny(points)
+
+            //voronoiResult.cells = voronoiResult.cells.filter((cell) => !cell.includes(-1))
+
+            const addedDescriptions: NestedDescriptions = {}
+
+            const streetLines = await imageDataToPolylines(streetResult.imageData)
+            if (streetLines.length > 0) {
+                addedDescriptions.DerivedStreet = convertPathwaysToDescription(
+                    streetLines,
+                    10,
+                    "street",
+                    streetResult.ratio,
+                    streetResult.offset
+                )
+            }
+
+            const footwalkLines = await imageDataToPolylines(footwalkResult.imageData)
+            if (footwalkLines.length > 0) {
+                addedDescriptions.DerivedFootwalk = convertPathwaysToDescription(
+                    footwalkLines,
+                    3,
+                    "footwalk",
+                    footwalkResult.ratio,
+                    footwalkResult.offset
+                )
+            }
+
+            outer: for (let i = 0; i < delaunyResults.length; i++) {
+                const cell = delaunyResults[i]
+
+                const centerX = Math.floor(cell.reduce((prev, index) => points[index][0] + prev, 0) / cell.length)
+                const centerY = Math.floor(cell.reduce((prev, index) => points[index][1] + prev, 0) / cell.length)
+
+                if (buildingsResult.imageData.data[(centerY * buildingsResult.imageData.width + centerX) * 4] < 100) {
+                    continue
+                }
+
+                for (let k = 0; k < cell.length; k++) {
+                    const w = (k + 1) % cell.length
+                    const lineCenterX = (points[k][0] + points[w][0]) / 2
+                    const lineCenterY = (points[k][1] + points[w][1]) / 2
+
+                    if (
+                        buildingsResult.imageData.data[
+                            (lineCenterY * buildingsResult.imageData.width + lineCenterX) * 4
+                        ] < 100
+                    ) {
+                        continue outer
+                    }
+                }
+
+                if (Math.random() > 0.7) {
+                    continue
+                }
+
+                addedDescriptions[`DerivedBuilding${i + 1}`] = convertCellToDescription(
+                    cell,
+                    points,
+                    buildingsResult.ratio,
+                    buildingsResult.offset,
+                    [centerX, centerY]
+                )
+            }
+
+            this.addDescriptions(addedDescriptions, { mode: "view" })
         },
 
         enterView(): void {
@@ -548,6 +629,51 @@ export function convertPathwaysToDescription(
     }
 }
 
+export function convertCellToDescription(
+    cell: Array<number>,
+    positions: Array<Vector2Tuple>,
+    ratio: number,
+    offset: number,
+    center: Vector2Tuple
+): NestedDescription {
+    const inset = Math.random() * 0.3
+    return {
+        rootNounIdentifier: "Start",
+        initialVariables: { type: "building" },
+        nouns: {
+            Start: {
+                transformation: {
+                    type: "sequential",
+                    children: [
+                        {
+                            type: "operation",
+                            identifier: "face",
+                            children: cell.map((index) => ({
+                                type: "operation",
+                                identifier: "point2",
+                                children: positions[index].map((value, i) => ({
+                                    type: "raw",
+                                    value: (value * (1 - inset) + center[i] * inset) * ratio + offset,
+                                })),
+                            })),
+                        },
+                        {
+                            type: "operation",
+                            identifier: "extrude",
+                            children: [
+                                {
+                                    type: "raw",
+                                    value: 2 + Math.random() * 30,
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+        },
+    }
+}
+
 export function getRawValue(transformation: ParsedTransformation): any {
     if (transformation.type != "raw") {
         throw new Error(`unexpected type "${transformation}" of transformation`)
@@ -641,6 +767,7 @@ function createInitialState(): AppState {
         workerInterface: startWorkerInterface(descriptions, requestedDuration),
         deriveThresholdFootwalk: 0.5,
         deriveThresholdStreet: 0.5,
+        deriveThresholdBuildings: 0.5,
         time: 0,
         duration: 0,
         playing: true,
@@ -667,4 +794,9 @@ function startWorkerInterface(descriptions: ParsedDescriptions, requestedDuratio
     )
     workerInterface.interprete(nestAST(descriptions, true), requestedDuration)
     return workerInterface
+}
+
+async function imageDataToPolylines(imageData: ImageData) {
+    const tracer = await TraceSkeleton.load()
+    return tracer.fromImageData(imageData).polylines as Array<Array<Vector2Tuple>>
 }

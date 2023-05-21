@@ -1,5 +1,5 @@
 import { Quaternion, Vector3, Vector4Tuple } from "three"
-import { Keyframe } from "./index.js"
+import { Keyframe, rotationSpeed } from "./index.js"
 
 const helperVector1 = new Vector3()
 const helperVector2 = new Vector3()
@@ -42,8 +42,6 @@ export function getEntityPositionAt(keyframes: Array<Keyframe>, time: number, in
     target.sub(helperVector1).multiplyScalar(percent).add(helperVector1)
 }
 
-const rotationSpeed = 2 //radians / s
-
 const q1 = new Quaternion()
 const q2 = new Quaternion()
 
@@ -77,7 +75,7 @@ export function getEntityRotationAt(keyframes: Array<Keyframe>, time: number, in
     target.slerp(q2, currentPeriod / rotationPeriod)
 }
 
-function angleBetween(a1: Vector4Tuple, a2: Vector4Tuple): number {
+export function angleBetween(a1: Vector4Tuple, a2: Vector4Tuple): number {
     q1.set(...a1)
     q2.set(...a2)
     return q1.angleTo(q2)

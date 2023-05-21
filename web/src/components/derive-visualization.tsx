@@ -3,30 +3,41 @@
 
 import { useThree } from "@react-three/fiber"
 import { HorizontalBlurShader, VerticalBlurShader } from "three-stdlib"
-import { Group, Mesh, OrthographicCamera, PlaneGeometry, ShaderMaterial, Vector2Tuple, WebGLRenderTarget } from "three"
+import {
+    ColorRepresentation,
+    Group,
+    Mesh,
+    OrthographicCamera,
+    PlaneGeometry,
+    ShaderMaterial,
+    WebGLRenderTarget,
+} from "three"
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useStore } from "../state/store.js"
 import { MotionEntity } from "pro-3d-video/motion"
-import { NestedDescription, NestedTransformation } from "pro-3d-video"
 import { addLines } from "./viewer/path.js"
-//@ts-ignore
-import TraceSkeleton from "skeleton-tracing-wasm"
 
 export type DerivedRoadsProps = {
     size?: number
     far?: number
     resolution?: number
     scale?: number
-    type: "Street" | "Footwalk"
+    type: "Street" | "Footwalk" | "Buildings"
+    invert?: boolean
+    color: ColorRepresentation
+    includeTypes?: Array<string | undefined>
 }
 
 export function DeriveVisualization({
     scale = 10,
     size = 1,
     far = 10,
-    resolution = 2048,
+    resolution = 1024,
     renderOrder,
     type,
+    invert,
+    color,
+    includeTypes,
     ...props
 }: Omit<JSX.IntrinsicElements["group"], "scale"> & DerivedRoadsProps) {
     const gl = useThree((state) => state.gl)
@@ -84,11 +95,12 @@ export function DeriveVisualization({
         blurPlane.visible = false
     }
 
-    const thresholdShadows = (treshold: number) => {
+    const thresholdShadows = (treshold: number, invert: boolean) => {
         blurPlane.visible = true
 
         blurPlane.material = thresholdMaterial
         thresholdMaterial.uniforms.threshold.value = treshold
+        thresholdMaterial.uniforms.invert.value = invert ? 1 : 0
         thresholdMaterial.uniforms.tDiffuse.value = renderTarget.texture
 
         gl.setRenderTarget(renderTargetBlur)
@@ -106,11 +118,7 @@ export function DeriveVisualization({
             const group = new Group()
 
             for (const entitiy of entities) {
-                const entityType =
-                    entitiy.url.includes("bus") || entitiy.url.includes("car") || entitiy.url.includes("train")
-                        ? "Street"
-                        : "Footwalk"
-                if (entityType === type) {
+                if (includeTypes == null || includeTypes.includes(entitiy.type)) {
                     addLines(group, entitiy.keyframes)
                 }
             }
@@ -119,9 +127,9 @@ export function DeriveVisualization({
             gl.render(group, shadowCamera.current)
 
             for (let i = 0; i < 7; i++) {
-                blurShadows(0.2)
+                blurShadows(0.6)
             }
-            thresholdShadows(threshold)
+            thresholdShadows(threshold, invert ?? false)
             if (pixels != null) {
                 const ctx = gl.getContext()
                 ctx.readPixels(
@@ -145,7 +153,6 @@ export function DeriveVisualization({
 
         state[`confirmDerived${type}`] = async () => {
             const state = useStore.getState()
-            const tracer = await TraceSkeleton.load()
             const bufferSize = renderTargetBlur.width * renderTargetBlur.height * 4
             const pixels = new Uint8Array(bufferSize)
             updateTexture(state.result.agents ?? [], state[`deriveThreshold${type}`], pixels)
@@ -154,9 +161,8 @@ export function DeriveVisualization({
             for (let i = 0; i < bufferSize; i++) {
                 imageData.data[i] = pixels[i]
             }
-            const polylines = tracer.fromImageData(imageData).polylines as Array<Array<Vector2Tuple>>
             return {
-                polylines,
+                imageData,
                 ratio: size / renderTargetBlur.width,
                 offset: -size / 2,
             }
@@ -176,7 +182,7 @@ export function DeriveVisualization({
         <group rotation-x={Math.PI / 2} {...props}>
             <mesh renderOrder={renderOrder} geometry={planeGeometry} scale={[1, -1, 1]} rotation={[-Math.PI / 2, 0, 0]}>
                 <meshBasicMaterial
-                    color={type === "Footwalk" ? "blue" : "red"}
+                    color={color}
                     transparent
                     map={renderTargetBlur.texture}
                     map-encoding={gl.outputEncoding}
@@ -191,6 +197,9 @@ const ThresholdShader = {
     uniforms: {
         threshold: {
             value: 0.5,
+        },
+        invert: {
+            value: 0,
         },
         tDiffuse: {
             value: null,
@@ -213,12 +222,15 @@ const ThresholdShader = {
         `
       uniform sampler2D tDiffuse;
       uniform float threshold;
+      uniform float invert;
   
       varying vec2 vUv;
   
       void main() {
           float x = texture2D( tDiffuse, vec2( vUv.x, vUv.y ) ).w;
-  
+          if(invert > 0.5) {
+            x = 1.0 - x;
+          }
           gl_FragColor = x > threshold ? vec4(1.0) : vec4(0.0);
   
       }

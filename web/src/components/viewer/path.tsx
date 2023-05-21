@@ -45,7 +45,8 @@ export function addLines(group: Group, keyframes: Array<Keyframe>) {
     for (let i = 1; i < keyframes.length; i++) {
         const p1 = new Vector3(...keyframes[i - 1].position)
         const p2 = new Vector3(...keyframes[i].position)
-        p1.y += 0.05
+        p1.y += 0.15
+        p2.y += 0.15
         points.push(p1, p2)
     }
 

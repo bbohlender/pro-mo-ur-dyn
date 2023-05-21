@@ -7,7 +7,7 @@ import { combine } from "zustand/middleware"
 import { MotionEntity, getEntityPositionAt, getEntityRotationAt, getKeyframeIndex } from "pro-3d-video/motion"
 const createZustand = create as any as typeof x.default
 
-export const FOV = 60
+export const FOV = 90
 
 //the position representation in the state all refer to the single tile at zoom 0
 
