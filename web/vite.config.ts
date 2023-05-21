@@ -6,5 +6,6 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     dedupe: ["three"]
-  }
+  },
+  base: "/pro-mo-ur-dyn"
 });

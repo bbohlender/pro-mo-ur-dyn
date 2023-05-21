@@ -43,7 +43,7 @@ export type Value = {
 
 export type InterpreterReferences = {
     requestedProgress: any
-    timeoutRef?: number
+    timeoutRef?: NodeJS.Timeout
 }
 
 export type InterpreterOptions = Readonly<{
