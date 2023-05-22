@@ -167,11 +167,8 @@ export function ProceduralLine() {
                 Math.ceil((panelRef.current.scrollTop + panelBounding.height) / lineHeightPixels)
             )
 
-            svgTextRef.current.style.minWidth = rem(textWidth)
             svgTextRef.current.style.minHeight = rem(agents.length * lineHeight)
 
-            svgLinesRef.current.style.left = rem(textWidth)
-            svgLinesRef.current.style.minWidth = (panelBounding.width - convertRemToPixels(textWidth)).toString()
             svgLinesRef.current.style.minHeight = rem(agents.length * lineHeight)
 
             functions.reset()
@@ -207,11 +204,15 @@ export function ProceduralLine() {
                 {minimized ? <ArrowsPointingOutIcon height={14} /> : <MinusSmallIcon />}
             </button>
             <Panel className={minimized ? "hidden" : ""}>
-                <div ref={panelRef} className="max-h-40 overflow-y-auto relative">
-                    <svg className="overflow-hidden" ref={svgTextRef} />
-                    <svg className="absolute top-0 left-0 overflow-hidden" ref={svgLinesRef} overflow="hidden">
-                        <line stroke="black" strokeWidth={2} y1="0%" y2="100%" x1="50%" x2="50%" />
-                    </svg>
+                <div ref={panelRef} className="max-h-40 overflow-y-auto flex flex-row">
+                    <div className="w-36">
+                        <svg overflow="hidden" className="w-full h-full" ref={svgTextRef} />
+                    </div>
+                    <div className="flex-grow basis-0">
+                        <svg ref={svgLinesRef} className="w-full h-full" overflow="hidden">
+                            <line stroke="black" strokeWidth={2} y1="0%" y2="100%" x1="50%" x2="50%" />
+                        </svg>
+                    </div>
                 </div>
             </Panel>
         </div>
@@ -223,7 +224,7 @@ function convertRemToPixels(rem: number) {
 }
 
 function rem(x: number) {
-    return `${x}rem`
+    return `${x * 16}px`
 }
 
 const lineDuration = 10
