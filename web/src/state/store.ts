@@ -19,7 +19,7 @@ import { combine } from "zustand/middleware"
 import { clamp, generateUUID } from "three/src/math/MathUtils.js"
 import { BufferGeometryLoader, Vector2Tuple } from "three"
 //@ts-ignore
-import Url from "./worker.js?url"
+import Url from "./worker.js?worker&url"
 //@ts-ignore
 import TraceSkeleton from "skeleton-tracing-wasm"
 //@ts-ignore

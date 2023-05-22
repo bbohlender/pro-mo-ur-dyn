@@ -9,7 +9,7 @@ import { Paths } from "./components/viewer/path.js"
 import { DeriveVisualization } from "./components/derive-visualization.js"
 import { ResultView } from "./components/viewer/result.js"
 //@ts-ignore
-import Url from "./state/worker.js?url"
+import Url from "./state/worker.js?worker&url"
 import { generateUUID } from "three/src/math/MathUtils.js"
 import { BufferGeometryLoader } from "three"
 
