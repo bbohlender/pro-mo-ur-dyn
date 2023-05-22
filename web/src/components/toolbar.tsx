@@ -101,7 +101,6 @@ function DropdownItem({ children, label }: PropsWithChildren<{ label: string }>)
             <label className="btn btn-ghost">{label}</label>
             {open && (
                 <div
-                    onClick={() => setOpen(false)}
                     style={{ minWidth: "13rem" }}
                     className="dropdown-content flex flex-col p-2 shadow bg-base-100 rounded-box gap-2">
                     {children}
@@ -177,8 +176,8 @@ async function importBuildingsPathways(url: string) {
     useStore.getState().addDescriptions({
         ...defaultDescription,
         ...convertLotsToDescriptions(layers),
-        Streets: convertPathwaysToDescription(layers, 10, "street", ["street", "secondary"]),
-        Footwalks: convertPathwaysToDescription(layers, 3, "footwalk", ["footwalk", "path"]),
+        Streets: convertPathwaysToDescription(layers, 14, "street", ["street", "secondary"]),
+        Footwalks: convertPathwaysToDescription(layers, 4, "footwalk", ["footwalk", "path"]),
     })
 }
 

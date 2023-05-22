@@ -36,7 +36,7 @@ export function TextEditor({ descriptionId }: { descriptionId: string }) {
                 spellCheck={false}
                 onKeyDown={(e) => onKeyDown(e, setText)}
                 onChange={(e) => setText(e.target.value)}
-                className="text-slate-950 w-full h-full m-3 bg-transparent border-0 flex-basis-0 flex-grow"
+                className="text-slate-950 w-full m-3 bg-transparent border-0 flex-basis-0 flex-grow"
             />
             {"error" in parseResult ? (
                 <ErrorMessage align="right" className="absolute bottom-5 left-5 right-5" message={parseResult.error} />

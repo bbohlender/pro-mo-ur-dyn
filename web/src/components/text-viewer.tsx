@@ -112,10 +112,8 @@ function Description(
 export function TextViewer({ descriptionId }: { descriptionId: string }) {
     return (
         <>
-            <div className="flex-grow-1 h-full overflow-y-auto">
-                <div className="m-3">
-                    <DescriptionViewer key={descriptionId} id={descriptionId} />
-                </div>
+            <div className="m-3 flex-grow">
+                <DescriptionViewer key={descriptionId} id={descriptionId} />
             </div>
 
             <div className="flex flex-row justify-end gap-3 p-3">

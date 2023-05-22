@@ -2,7 +2,8 @@ import { MotionEntity, Keyframe, getKeyframeIndex } from "pro-3d-video/motion"
 import { AppState, useStore } from "../state/store.js"
 import { Panel } from "./panel.js"
 import { generateUUID } from "three/src/math/MathUtils.js"
-import { Key, RefObject, useEffect, useMemo, useRef } from "react"
+import { Key, RefObject, useEffect, useMemo, useRef, useState } from "react"
+import { MinusSmallIcon, ArrowsPointingOutIcon } from "@heroicons/react/20/solid"
 
 const lineHeight = 3
 const yPadding = 1
@@ -17,6 +18,8 @@ export function ProceduralLine() {
     const svgTextRef = useRef<SVGSVGElement>(null)
     const svgLinesRef = useRef<SVGSVGElement>(null)
     const agentsLength = useStore((state) => state.result.agents?.length ?? 0) as number
+
+    const [minimized, setMinimized] = useState(false)
 
     const functions = useMemo(() => {
         let followTextIndex = 0
@@ -197,14 +200,21 @@ export function ProceduralLine() {
     }
 
     return (
-        <Panel>
-            <div ref={panelRef} className="max-h-40 overflow-y-auto relative">
-                <svg className="overflow-hidden" ref={svgTextRef} />
-                <svg className="absolute top-0 left-0 overflow-hidden" ref={svgLinesRef} overflow="hidden">
-                    <line stroke="black" strokeWidth={2} y1="0%" y2="100%" x1="50%" x2="50%" />
-                </svg>
-            </div>
-        </Panel>
+        <div className="flex flex-col items-stretch gap-1">
+            <button
+                onClick={() => setMinimized((m) => !m)}
+                className="pointer-events-auto btn btn-circle btn-xs self-end btn-outline">
+                {minimized ? <ArrowsPointingOutIcon height={14} /> : <MinusSmallIcon />}
+            </button>
+            <Panel className={minimized ? "hidden" : ""}>
+                <div ref={panelRef} className="max-h-40 overflow-y-auto relative">
+                    <svg className="overflow-hidden" ref={svgTextRef} />
+                    <svg className="absolute top-0 left-0 overflow-hidden" ref={svgLinesRef} overflow="hidden">
+                        <line stroke="black" strokeWidth={2} y1="0%" y2="100%" x1="50%" x2="50%" />
+                    </svg>
+                </div>
+            </Panel>
+        </div>
     )
 }
 
